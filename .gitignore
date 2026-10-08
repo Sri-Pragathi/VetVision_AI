@@ -44,3 +44,6 @@ test_uploads/
 backend/uploads/
 backend/test_uploads/
 
+# Frontend build & dependencies
+frontend/node_modules/
+frontend/dist/

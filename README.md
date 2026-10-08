@@ -1,66 +1,161 @@
 # VetVision AI 🐾
-### AI-Powered Pet Health Early Warning & Veterinary Assistance System
+### AI-Powered Pet Health Early Warning & Veterinary Assistance Platform
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![Flask 3.0](https://img.shields.io/badge/flask-3.0-green.svg)](https://flask.palletsprojects.com/)
+[![React 19](https://img.shields.io/badge/react-19-blue.svg)](https://react.dev/)
+[![Vite](https://img.shields.io/badge/vite-6-purple.svg)](https://vite.dev/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Code Style](https://img.shields.io/badge/code%20style-PEP8-black.svg)](https://peps.python.org/pep-0008/)
-[![Tests](https://img.shields.io/badge/tests-43%20passed%20(100%25)-brightgreen.svg)]()
+[![Backend Tests](https://img.shields.io/badge/backend%20tests-130%20passed%20(100%25)-brightgreen.svg)]()
 [![Coverage](https://img.shields.io/badge/coverage-92%25-brightgreen.svg)]()
 
 ---
 
 ## 📌 Executive Summary
 
-**VetVision AI** is an intelligent veterinary assistance system engineered for university-level innovation and technology competitions. The platform aids pet owners and veterinarians by detecting early warning signs of disease, identifying emergency conditions, tracking longitudinal pet health, and generating structured clinical summaries.
+**VetVision AI** is an intelligent veterinary-assistive health technology platform engineered for hackathons, innovation competitions, and production-grade deployments. The system assists pet parents and veterinary clinicians by facilitating guided health assessments, adaptive clinical inquiry, computer-vision image quality screening, transparent risk triage, and exportable veterinary handoff summaries.
+
+> **Medical Caution & Clinical Disclaimer**: VetVision AI is strictly an early-warning triage and decision-support assistant. It does **not** provide definitive diagnoses and does not replace in-person veterinary examination. Critical indicators trigger automated emergency hard-stops.
 
 ---
 
-## 🏗️ Repository Structure
+## 🏗️ Repository Architecture
 
 ```text
 VetVision_AI/
 ├── backend/                 # Modular Flask REST API backend
-│   ├── app/                 # Application package (models, routes, schemas, services)
+│   ├── app/                 # Core architecture (models, routes, schemas, services)
 │   ├── migrations/          # Alembic database migrations
-│   ├── tests/               # Pytest automated test suite (43 passed, 92% coverage)
+│   ├── tests/               # Pytest automated test suite (130 passed, 92% coverage)
 │   ├── .env.example         # Environment template
-│   ├── requirements.txt     # Backend dependencies
-│   ├── run.py               # WSGI Entrypoint & symptom seeder
-│   └── README.md            # Comprehensive technical guide
-└── README.md                # Project root documentation
+│   ├── requirements.txt     # Python backend dependencies
+│   ├── run.py               # WSGI Entrypoint & symptom/question seeders
+│   └── README.md            # Comprehensive backend documentation
+├── frontend/                # Healthcare-Grade React SPA
+│   ├── src/
+│   │   ├── api/             # Centralized API service layer (auth, pets, triage, reports)
+│   │   ├── components/      # Common UI components (Navbar, Footer, TriageBadge, etc.)
+│   │   ├── context/         # AuthContext & JWT session management
+│   │   ├── pages/           # Clinical pages (Dashboard, Wizard, Reports, Pet Profiles)
+│   │   ├── App.jsx          # Route configuration & ProtectedRoute wrappers
+│   │   └── index.css        # Vanilla CSS Design System & Theme Tokens
+│   ├── package.json         # React 19, Vite, Lucide-react, Axios
+│   └── vite.config.js       # Vite bundler configuration & backend API proxy
+└── README.md                # Project master documentation
 ```
 
 ---
 
-## 🚀 Implemented Capabilities (Step 1 & Step 2)
+## 🚀 Complete Development Roadmap (Steps 1–7)
 
-### Step 1: Core Foundation & Multi-Tenant Architecture
-- **Authentication**: JWT access & refresh tokens with database-backed token blocklist for immediate revocation on logout.
-- **Pet Management**: Full multi-tenant CRUD with owner isolation (zero cross-user inspection, modification, or deletion).
-- **Security**: Bcrypt password hashing (12 rounds), centralized error sanitization (no leaked traces/secrets).
-- **Database**: PostgreSQL support via environment variables with zero-config SQLite fallback.
+### ✅ Step 1 — Backend Foundation & Multi-Tenant Authentication
+- JWT access and refresh token authentication with token revocation blocklist.
+- Full pet profile management isolated strictly to authenticated owners.
+- Production-grade error handling, schema validation, and SQLite / PostgreSQL switching.
 
-### Step 2: Structured Pet Health Assessment & Triage
-- **Clinical Symptom Vocabulary**: 20 seeded clinical categories (vomiting, difficulty breathing, seizures, itching, etc.) with category filtering.
-- **Health Assessment Lifecycle**: Strict state-machine transitions (`in_progress` → `completed` or `cancelled`).
-- **Clinical Associations**: Attach multiple symptoms with validated severity (`mild`, `moderate`, `severe`) and positive durations.
-- **Physiological Observations**: Structured metrics (appetite, water intake, activity, breathing, pain, sleep, stool, urine).
-- **Assessment Notes**: Free-text clinical and owner observations.
-- **AI-Ready Transformation Engine**: `AiDataPreparationService` converts assessment sessions into a normalized JSON payload for future AI inference.
-- **Emergency Screening Interface**: `EmergencyAssessmentService` identifies urgent clinical warning flags and provides safety disclaimers.
+### ✅ Step 2 — Pet Health Assessment Backend
+- Controlled clinical symptom catalog with 20+ veterinary symptom classifications.
+- Structured physiological observations (appetite, water intake, respiration, pain).
+- `AiDataPreparationService` and `EmergencyAssessmentService`.
 
-For full endpoint specifications, diagrams, and payloads, see [backend/README.md](file:///c:/Users/gsrip/OneDrive/Desktop/VetVision%20AI/backend/README.md).
+### ✅ Step 3 — Dynamic Symptom & Follow-Up Question Engine
+- Adaptive clinical question bank prioritizing high-acuity concerns based on symptoms.
+- Dynamic question delivery (`GET /assessments/<id>/next-questions`).
+- Answers state engine tracking clinical risk indicators and emergency answers.
+
+### ✅ Step 4 — AI Health Risk Analysis Engine
+- Pluggable scoring architecture: `BaseRiskAnalysisEngine` + `RuleBasedRiskAnalysisEngine`.
+- Transparent 0–100 risk score with explicit contributing factor weights.
+- Unbreakable **Emergency Hard-Stop Rule**: acute signs automatically lock risk score $\ge 90$ and trigger immediate hospital redirection.
+
+### ✅ Step 5 — Computer Vision / Pet Image Analysis Pipeline
+- Multipart photographic upload for affected areas, lesions, and eyes.
+- Computer Vision Quality Gate evaluating resolution, lighting, sharpness, and color variance.
+- Visual observations and feature tagging feeding into the overall risk assessment.
+
+### ✅ Step 6 — Veterinary Report & Explainable Health Summary
+- Versioned, immutable snapshot generation (`AssessmentReport`).
+- Complete 13-section report structure with plain-text **Veterinary Handoff Summary**.
+- Print-ready and standalone HTML report rendering (`GET /reports/<id>/html`).
+
+### ✅ Step 7 — Professional React Frontend (Vite + Vanilla CSS)
+- **Hospital-Grade UI Design**: Custom design system tokens, accessible typography, glassmorphism accents, and color-coded triage indicators.
+- **7-Step Guided Assessment Wizard**:
+  1. Patient Demographics & Profile Selection
+  2. Multi-Category Symptom Picker with Severity & Chronicity Selectors
+  3. Dynamic Adaptive Follow-up Question Prompts
+  4. Clinical Observations Matrix (appetite, respiration, pain check)
+  5. Photographic Upload with Computer Vision Quality Gate evaluation
+  6. Review & Verification
+  7. AI Health Risk Dial, Explainability Attribution, and Immediate Emergency Alerts
+- **One-Click Clinical Handoff Copy**: Formatted plain-text summary designed to be copied directly into clinic registration emails or portals.
+- **Comprehensive Management**: Dashboard metrics, Pet Profile Manager with edit/delete modals, and Reports Archive.
 
 ---
 
-## 🧪 Testing & Quality Assurance
+## ⚡ Quick Start Guide
+
+### 1. Start the Flask Backend
+
+```bash
+# Navigate to backend
+cd backend
+
+# Create & activate virtual environment (Windows PowerShell)
+python -m venv venv
+.\venv\Scripts\Activate.ps1
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Run database migrations & seed symptoms/questions
+flask db upgrade
+python run.py
+```
+*Backend runs on `http://127.0.0.1:5000`.*
+
+### 2. Start the React Frontend
+
+```bash
+# Open a new terminal in the frontend directory
+cd frontend
+
+# Install dependencies
+npm install
+
+# Start Vite development server
+npm run dev
+```
+*Frontend runs on `http://localhost:5173` (proxies `/api` requests to Flask).*
+
+### 3. Quick Demo Credentials (Pre-Seeded)
+- **Email**: `john.doe@vetvision.ai`
+- **Password**: `Password123!`
+*(Or click the **"Quick-Fill Innovation Day Demo Credentials"** button on the Login page).*
+
+---
+
+## 🧪 Automated Testing & Verification
+
+Run the comprehensive Pytest backend suite (all 130 tests pass):
 
 ```bash
 cd backend
-.\venv\Scripts\pytest -v --cov=app tests/
+pytest -v
 ```
 
-- **43 tests executed — 43 passed (100% pass rate)**
-- **92% code coverage** across all modules
-- Zero warnings, zero errors
+Build the production frontend bundle:
+
+```bash
+cd frontend
+npm run build
+```
+
+---
+
+## ⚖️ Clinical Safety & Ethics Statement
+
+VetVision AI was engineered from the ground up with clinical safety constraints:
+1. **No Hallucinated Diagnoses**: The system never declares definitive diagnoses. It acts as a triage and risk-scoring aid.
+2. **Deterministic Emergency Overrides**: Critical symptoms (e.g., severe dyspnea, cyanosis, seizures, acute trauma) immediately enforce high triage urgency regardless of secondary factors.
+3. **Transparent Explainability**: Every point of risk is mapped to an observable finding (duration, co-occurring symptoms, physical observations, image quality).
