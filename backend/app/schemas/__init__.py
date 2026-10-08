@@ -38,6 +38,10 @@ from app.schemas.assessment_schema import (
     health_assessment_response_schema,
     health_assessments_response_schema,
 )
+from app.schemas.risk_analysis_schema import (
+    RiskAnalysisResponseSchema,
+    risk_analysis_response_schema,
+)
 
 __all__ = [
     "RegisterSchema",
@@ -71,4 +75,6 @@ __all__ = [
     "assessment_status_update_schema",
     "health_assessment_response_schema",
     "health_assessments_response_schema",
+    "RiskAnalysisResponseSchema",
+    "risk_analysis_response_schema",
 ]

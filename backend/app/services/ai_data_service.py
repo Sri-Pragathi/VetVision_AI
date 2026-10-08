@@ -1,5 +1,5 @@
-"""AI Data Preparation Service for transforming clinical assessments into structured AI input."""
-from typing import Dict, Any, List
+from datetime import date
+from typing import Dict, Any, List, Optional
 from app.models.health_assessment import HealthAssessment
 
 
@@ -12,15 +12,46 @@ class AiDataPreparationService:
     """
 
     @staticmethod
-    def prepare_ai_payload(assessment: HealthAssessment) -> Dict[str, Any]:
+    def _normalize_duration_to_hours(val: Optional[float], unit: Optional[str]) -> Optional[float]:
+        """Convert duration into standardized hours."""
+        if val is None:
+            return None
+        unit_str = (unit or "").lower().strip()
+        if "hour" in unit_str:
+            return float(val)
+        if "day" in unit_str:
+            return float(val) * 24.0
+        if "week" in unit_str:
+            return float(val) * 168.0
+        if "month" in unit_str:
+            return float(val) * 720.0
+        return float(val)
+
+    @classmethod
+    def prepare_ai_payload(cls, assessment: HealthAssessment) -> Dict[str, Any]:
         """Convert a HealthAssessment instance into a clean AI-ready dictionary."""
         pet = assessment.pet
+
+        # Calculate age in months and developmental stage
+        age_in_months: Optional[int] = None
+        if pet and pet.date_of_birth:
+            today = date.today()
+            dob = pet.date_of_birth
+            age_in_months = max(0, (today.year - dob.year) * 12 + (today.month - dob.month))
+        elif pet and pet.age is not None:
+            age_in_months = pet.age * 12
+
+        is_juvenile = (age_in_months is not None and age_in_months < 12)
+        is_senior = (pet.age is not None and pet.age >= 9) if pet else False
 
         # 1. Pet Demographic & Medical Baseline
         pet_profile: Dict[str, Any] = {
             "species": pet.species if pet else None,
             "breed": pet.breed if pet else None,
             "age": pet.age if pet else None,
+            "age_in_months": age_in_months,
+            "is_juvenile": is_juvenile,
+            "is_senior": is_senior,
             "sex": pet.sex if pet else None,
             "weight": pet.weight if pet else None,
             "allergies": pet.allergies if pet else None,
@@ -32,6 +63,9 @@ class AiDataPreparationService:
         symptoms_list: List[Dict[str, Any]] = []
         if assessment.symptoms:
             for item in assessment.symptoms:
+                dur_hours = cls._normalize_duration_to_hours(
+                    item.duration_value, item.duration_unit
+                )
                 symptoms_list.append({
                     "name": item.symptom.name if item.symptom else None,
                     "category": item.symptom.category if item.symptom else None,
@@ -40,6 +74,7 @@ class AiDataPreparationService:
                         "value": item.duration_value,
                         "unit": item.duration_unit,
                     },
+                    "duration_hours": dur_hours,
                     "notes": item.notes,
                 })
 

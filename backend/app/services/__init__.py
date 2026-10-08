@@ -6,6 +6,8 @@ from app.services.symptom_service import SymptomService
 from app.services.assessment_service import AssessmentService
 from app.services.ai_data_service import AiDataPreparationService
 from app.services.emergency_service import EmergencyAssessmentService
+from app.services.risk_analysis_service import RiskAnalysisService
+from app.services.risk_engine import BaseRiskAnalysisEngine, RuleBasedRiskAnalysisEngine, RiskAnalysisOutput
 
 __all__ = [
     "AuthService",
@@ -15,4 +17,8 @@ __all__ = [
     "AssessmentService",
     "AiDataPreparationService",
     "EmergencyAssessmentService",
+    "RiskAnalysisService",
+    "BaseRiskAnalysisEngine",
+    "RuleBasedRiskAnalysisEngine",
+    "RiskAnalysisOutput",
 ]

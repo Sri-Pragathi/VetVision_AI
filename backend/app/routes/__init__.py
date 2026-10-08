@@ -9,6 +9,8 @@ from app.routes.assessment_routes import assessment_bp
 # Step 3: Dynamic Question Engine
 from app.routes.question_routes import question_bp
 from app.routes.answer_routes import answer_bp
+# Step 4: AI Health Risk Analysis Engine
+from app.routes.risk_analysis_routes import risk_analysis_bp
 
 
 def register_routes(app: Flask) -> None:
@@ -25,6 +27,8 @@ def register_routes(app: Flask) -> None:
     # Step 3
     api_v1.register_blueprint(question_bp)
     api_v1.register_blueprint(answer_bp)
+    # Step 4
+    api_v1.register_blueprint(risk_analysis_bp)
 
     # Register root v1 blueprint with main app
     app.register_blueprint(api_v1)

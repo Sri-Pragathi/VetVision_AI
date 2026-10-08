@@ -337,16 +337,17 @@ The `EmergencyAssessmentService` provides an initial computational safety layer:
 ```bash
 cd backend
 
-# Run all tests (Steps 1, 2, and 3)
+# Run all tests (Steps 1, 2, 3, and 4)
 .\venv\Scripts\pytest -v
 
 # Run with coverage report
 .\venv\Scripts\pytest --cov=app tests/
 ```
 
-**Results (Step 3 Complete):**
-- **73 / 74 tests passing** (1 skipped — text-type question skipped if not in Digestive seed)
-- **0 regressions** — all Step 1 and Step 2 tests continue to pass.
+**Results (Step 4 Complete):**
+- **90 / 91 tests passing** (1 skipped — text-type question format)
+- **92% Code Coverage** across 2,042 statements
+- **0 regressions** — all Step 1, 2, and 3 tests continue to pass.
 
 ---
 
@@ -498,13 +499,152 @@ flask db upgrade
 
 ---
 
-## 12. Implementation Roadmap
+## 12. Step 4 — AI Health Risk Analysis Engine
+
+### Overview
+
+Step 4 implements an **explainable, transparent pet health risk analysis engine** designed with an **ML-ready pluggable architecture**. The engine evaluates multi-modal data collected across Steps 1–3:
+- **Pet Demographics & History** — species, calculated age, developmental vulnerabilities (juvenile / senior), existing conditions, allergies.
+- **Symptom Manifestations** — clinical severity (`mild`, `moderate`, `severe`), duration progression (normalized to hours/days), co-occurrence.
+- **Physiological & Behavioral Observations** — appetite, dehydration risks, activity depression, respiratory effort, pain signs, elimination abnormalities.
+- **Dynamic Follow-Up Q&A** — clinical weights from user answers, indicators of worsening condition.
+- **Emergency Triage Indicators** — hard-stop prioritization for acute life-threatening situations.
+
+### Pluggable Architecture (`BaseRiskAnalysisEngine`)
+
+```
+┌────────────────────────────────────────────────────────┐
+│               AiDataPreparationService                 │
+│         (Normalizes Steps 1–3 Clinical Data)           │
+└───────────────────────────┬────────────────────────────┘
+                            │
+┌───────────────────────────▼────────────────────────────┐
+│                  RiskAnalysisService                   │
+│   (Ownership validation, state checks, persistence)    │
+└───────────────────────────┬────────────────────────────┘
+                            │
+              ┌─────────────┴─────────────┐
+              │  BaseRiskAnalysisEngine   │
+              │     (Abstract Adapter)    │
+              └─────────────┬─────────────┘
+                            │
+         ┌──────────────────┴──────────────────┐
+         ▼                                     ▼
+┌─────────────────────────────────┐   ┌────────────────────────────────┐
+│   RuleBasedRiskAnalysisEngine   │   │     Future ML Model Adapter    │
+│  (Clinical Heuristic Scoring)   │   │   (PyTorch / ONNX / LightGBM)  │
+│      Active Implementation      │   │    Drop-in without rewrites    │
+└─────────────────────────────────┘   └────────────────────────────────┘
+```
+
+The system does **NOT** invent a trained AI model, fabricate accuracy percentages, or claim definitive veterinary disease diagnosis. It provides transparent clinical heuristic scoring via `RuleBasedRiskAnalysisEngine` while providing `BaseRiskAnalysisEngine` so trained veterinary ML models can be plugged in later with zero architectural rewrites.
+
+---
+
+### Risk Levels & Scoring Breakdown
+
+| Risk Level | Score Range | Primary Recommendation |
+|---|---|---|
+| **LOW** | 0 – 29 | Routine home monitoring. Contact vet if symptoms persist beyond 48 hours. |
+| **MODERATE** | 30 – 59 | Non-urgent veterinary examination recommended within 24–48 hours. |
+| **HIGH** | 60 – 84 | Urgent veterinary evaluation recommended as soon as possible (same day). |
+| **EMERGENCY** | 85 – 100 | Immediate emergency veterinary hospital attention required. Do not wait. |
+
+### Emergency Hard-Stop Rule (Non-Downgrade Guarantee)
+
+Emergency conditions are **never downgraded** even if other symptom counts are low.
+If any of the following triggers are present:
+1. Critical symptoms (`difficulty breathing`, `seizures`, `collapse`, `severe bleeding`, `unresponsiveness`) with moderate or severe severity.
+2. Abnormal respiratory effort (`labored` or `wheezing` in observations).
+3. Severe physical pain (`pain_observed == severe`).
+4. Follow-up answer with an emergency flag (`emergency_flag == True` or `triggered_emergency == True`).
+
+The engine **immediately enforces**:
+- `risk_level = "EMERGENCY"`
+- `risk_score = max(calculated_score, 90)` (floor of 90)
+- `emergency = True` / `is_emergency = True`
+- Emergency triggers featured prominently at the top of `key_factors`
+- Clear emergency veterinary hospital warning
+
+---
+
+### Step 4 Database Model (`AssessmentRiskAnalysis`)
+
+Table: `assessment_risk_analyses`  
+Migration: `migrations/versions/f13704143945_add_step_4_assessment_risk_analyses_.py`
+
+| Column | Type | Description |
+|---|---|---|
+| `id` | String(36) UUID | Primary key |
+| `assessment_id` | FK → HealthAssessment | Unique 1-to-1 link (`CASCADE`), indexed |
+| `risk_level` | String(20) | `LOW`, `MODERATE`, `HIGH`, `EMERGENCY` |
+| `risk_score` | Integer | 0 to 100 normalized score |
+| `key_factors` | JSON | Human-readable explanation factors (top drivers) |
+| `factor_breakdown` | JSON | Sub-scores: symptoms, duration, observations, answers, vulnerability |
+| `recommendation` | Text | Clinical action recommendation |
+| `is_emergency` | Boolean | Emergency indicator flag |
+| `engine_version` | String(50) | `v1.0.0-rule_hybrid` |
+| `disclaimer` | Text | Mandatory veterinary safety disclaimer |
+| `created_at` | DateTime(tz) | Timestamp generated |
+| `updated_at` | DateTime(tz) | Timestamp updated |
+
+---
+
+### Step 4 APIs
+
+| Method | Endpoint | Auth | Description |
+|---|---|---|---|
+| `POST` | `/api/v1/assessments/<id>/risk-analysis` | JWT | Execute explainable risk analysis & persist result |
+| `GET` | `/api/v1/assessments/<id>/risk-analysis` | JWT | Retrieve latest stored risk analysis result |
+
+#### Sample API Response:
+
+```json
+{
+  "status": "success",
+  "message": "AI health risk analysis completed successfully",
+  "data": {
+    "id": "c620436d-b847-49d9-bbd1-dfa4c038481c",
+    "assessment_id": "17a3d660-3893-465b-9745-c7e1e47cd22d",
+    "risk_level": "HIGH",
+    "risk_score": 72,
+    "key_factors": [
+      "Severe primary symptom: Diarrhea",
+      "Symptoms persisting for several days (3–7 days)",
+      "Complete loss of appetite / anorexia",
+      "Noticeable lethargy and sluggishness",
+      "Follow-up response indicates worsening clinical condition"
+    ],
+    "factor_breakdown": {
+      "symptom_score": 45,
+      "duration_score": 12,
+      "observation_score": 24,
+      "follow_up_score": 11,
+      "vulnerability_modifier": 0,
+      "emergency_override": false,
+      "raw_calculated_score": 92
+    },
+    "recommendation": "Urgent veterinary evaluation recommended as soon as possible (same day). Monitor pet closely and do not leave unattended.",
+    "emergency": false,
+    "is_emergency": false,
+    "engine_version": "v1.0.0-rule_hybrid",
+    "disclaimer": "This assessment is for early-warning support and does not replace professional veterinary diagnosis. If your pet is in acute distress, contact an emergency veterinary hospital immediately.",
+    "created_at": "2026-10-08T15:00:00+00:00",
+    "updated_at": "2026-10-08T15:00:00+00:00"
+  }
+}
+```
+
+---
+
+## 13. Implementation Roadmap
 
 | Step | Description | Status |
 |---|---|---|
 | **Step 1** | Backend Foundation — Auth, Users, Pets, DB, JWT, Migrations | ✅ Complete |
 | **Step 2** | Pet Health Assessment — Symptoms, Observations, Notes, AI Data Prep | ✅ Complete |
 | **Step 3** | Dynamic Question Engine — Follow-Up Q&A, Emergency Triage, Conditional Logic | ✅ Complete |
-| **Step 4** | AI Disease/Risk Prediction Model | 🔜 Next |
-| **Step 5** | Image Analysis Pipeline | 🔜 Future |
-| **Step 6** | Veterinary Report Generation | 🔜 Future |
+| **Step 4** | AI Health Risk Analysis Engine — Explainable Scoring, Emergency Hard-Stop, ML Adapter | ✅ Complete |
+| **Step 5** | Image Analysis Pipeline — Computer Vision & Lesion Detection | 🔜 Next |
+| **Step 6** | Veterinary Report Generation — PDF / Exportable Clinical Summaries | 🔜 Future |
+

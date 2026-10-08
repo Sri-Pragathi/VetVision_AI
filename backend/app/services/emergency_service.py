@@ -62,6 +62,16 @@ class EmergencyAssessmentService:
             if risk_level != "emergency":
                 risk_level = "urgent"
 
+        # Check follow-up answers for acute emergency triggers
+        answers = data.get("follow_up_answers", [])
+        for ans in answers:
+            if ans.get("triggered_emergency"):
+                q_text = ans.get("question") or "Question"
+                opt_text = ans.get("answer_option") or "Emergency response"
+                flags.append(f"Emergency indicator in answer: {opt_text} ({q_text})")
+                is_emergency = True
+                risk_level = "emergency"
+
         recommendation = (
             "Immediate emergency veterinary consultation recommended."
             if is_emergency

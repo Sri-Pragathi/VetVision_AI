@@ -11,6 +11,8 @@ from app.models.assessment_note import AssessmentNote
 from app.models.follow_up_question import FollowUpQuestion, FollowUpQuestionOption
 from app.models.assessment_answer import AssessmentAnswer
 from app.models.question_bank import seed_follow_up_questions
+# Step 4: Health Risk Analysis Engine
+from app.models.risk_analysis import AssessmentRiskAnalysis
 
 __all__ = [
     "User",
@@ -28,4 +30,6 @@ __all__ = [
     "FollowUpQuestionOption",
     "AssessmentAnswer",
     "seed_follow_up_questions",
+    # Step 4
+    "AssessmentRiskAnalysis",
 ]

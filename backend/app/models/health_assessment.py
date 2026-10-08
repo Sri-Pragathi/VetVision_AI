@@ -79,6 +79,14 @@ class HealthAssessment(db.Model):
         order_by="AssessmentNote.created_at.asc()",
     )
 
+    risk_analysis = db.relationship(
+        "AssessmentRiskAnalysis",
+        back_populates="assessment",
+        uselist=False,
+        cascade="all, delete-orphan",
+        lazy="select",
+    )
+
     def complete(self) -> None:
         """Mark assessment as completed and set completion timestamp."""
         self.status = self.STATUS_COMPLETED
@@ -104,6 +112,7 @@ class HealthAssessment(db.Model):
             res["symptoms"] = [s.to_dict() for s in self.symptoms] if self.symptoms else []
             res["observations"] = self.observations.to_dict() if self.observations else None
             res["notes"] = [n.to_dict() for n in self.notes] if self.notes else []
+            res["risk_analysis"] = self.risk_analysis.to_dict() if self.risk_analysis else None
 
         return res
 
