@@ -87,6 +87,14 @@ class HealthAssessment(db.Model):
         lazy="select",
     )
 
+    images = db.relationship(
+        "AssessmentImage",
+        back_populates="assessment",
+        cascade="all, delete-orphan",
+        lazy="select",
+        order_by="AssessmentImage.created_at.asc()",
+    )
+
     def complete(self) -> None:
         """Mark assessment as completed and set completion timestamp."""
         self.status = self.STATUS_COMPLETED
@@ -113,6 +121,7 @@ class HealthAssessment(db.Model):
             res["observations"] = self.observations.to_dict() if self.observations else None
             res["notes"] = [n.to_dict() for n in self.notes] if self.notes else []
             res["risk_analysis"] = self.risk_analysis.to_dict() if self.risk_analysis else None
+            res["images"] = [img.to_dict() for img in self.images] if self.images else []
 
         return res
 

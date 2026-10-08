@@ -37,3 +37,10 @@ Thumbs.db
 Desktop.ini
 .vscode/
 .idea/
+
+# Uploads & Media
+uploads/
+test_uploads/
+backend/uploads/
+backend/test_uploads/
+

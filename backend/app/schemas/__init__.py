@@ -42,6 +42,14 @@ from app.schemas.risk_analysis_schema import (
     RiskAnalysisResponseSchema,
     risk_analysis_response_schema,
 )
+from app.schemas.image_schema import (
+    AssessmentImageResponseSchema,
+    ImageObservationResponseSchema,
+    assessment_image_response_schema,
+    assessment_images_response_schema,
+    image_observation_response_schema,
+    image_observations_response_schema,
+)
 
 __all__ = [
     "RegisterSchema",
@@ -77,4 +85,10 @@ __all__ = [
     "health_assessments_response_schema",
     "RiskAnalysisResponseSchema",
     "risk_analysis_response_schema",
+    "AssessmentImageResponseSchema",
+    "ImageObservationResponseSchema",
+    "assessment_image_response_schema",
+    "assessment_images_response_schema",
+    "image_observation_response_schema",
+    "image_observations_response_schema",
 ]

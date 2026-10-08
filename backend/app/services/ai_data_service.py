@@ -149,10 +149,53 @@ class AiDataPreparationService:
             # Gracefully degrade if the answers table is unavailable
             follow_up_answers = []
 
+        # 6. Step 5: Computer Vision Visual Observations
+        #    Provides structured visual features extracted from attached pet photographs.
+        image_analysis_data: Dict[str, Any] = {
+            "images_count": 0,
+            "analyzed_count": 0,
+            "observations": [],
+        }
+        try:
+            from app.models.assessment_image import AssessmentImage
+            images = (
+                AssessmentImage.query
+                .filter_by(assessment_id=assessment.id)
+                .order_by(AssessmentImage.created_at.asc())
+                .all()
+            )
+            analyzed_images = [img for img in images if img.analysis_status == "ANALYZED"]
+            all_observations = []
+            for img in analyzed_images:
+                for obs in img.observations:
+                    all_observations.append({
+                        "image_id": img.id,
+                        "observation_type": obs.observation_type,
+                        "observation_label": obs.observation_label,
+                        "severity": obs.severity,
+                        "region": obs.region,
+                        "description": obs.description,
+                        "source": obs.source,
+                        "model_version": obs.model_version,
+                    })
+
+            image_analysis_data = {
+                "images_count": len(images),
+                "analyzed_count": len(analyzed_images),
+                "observations": all_observations,
+            }
+        except Exception:
+            image_analysis_data = {
+                "images_count": 0,
+                "analyzed_count": 0,
+                "observations": [],
+            }
+
         return {
             "pet": pet_profile,
             "symptoms": symptoms_list,
             "observations": observations_data,
             "additional_notes": combined_notes,
             "follow_up_answers": follow_up_answers,
+            "image_analysis": image_analysis_data,
         }

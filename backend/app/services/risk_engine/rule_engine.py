@@ -76,12 +76,18 @@ class RuleBasedRiskAnalysisEngine(BaseRiskAnalysisEngine):
         key_factors.extend(vuln_factors)
         factor_breakdown["vulnerability_modifier"] = vuln_score
 
-        # 7. Aggregate Raw Score (Base Sum)
-        raw_score = symptom_score + duration_score + obs_score + answers_score + vuln_score
+        # 7. Computer Vision Visual Observations Component (Max 8 pts)
+        img_analysis = payload.get("image_analysis") or {}
+        img_score, img_factors = self._calculate_image_score(img_analysis)
+        key_factors.extend(img_factors)
+        factor_breakdown["image_score"] = img_score
+
+        # 8. Aggregate Raw Score (Base Sum)
+        raw_score = symptom_score + duration_score + obs_score + answers_score + vuln_score + img_score
         calculated_score = min(100, max(0, raw_score))
         factor_breakdown["raw_calculated_score"] = calculated_score
 
-        # 8. Apply Emergency Hard-Stop Rule
+        # 9. Apply Emergency Hard-Stop Rule
         factor_breakdown["emergency_override"] = False
 
         if is_emergency or emergency_flags:
@@ -309,6 +315,35 @@ class RuleBasedRiskAnalysisEngine(BaseRiskAnalysisEngine):
             factors.append(f"Pre-existing health conditions in profile: {conditions[:60]}")
 
         return min(15, score), factors
+
+    def _calculate_image_score(
+        self, img_analysis: Dict[str, Any]
+    ) -> Tuple[int, List[str]]:
+        """Score structured observations extracted from computer vision image analysis.
+
+        Crucial Safety Constraints:
+        - Image existence alone never increases risk score.
+        - Low quality images produce an informational notice, not disease conclusions.
+        - Supported visual features (e.g. erythema) provide modest correlated signal (max 8 pts).
+        """
+        score = 0
+        factors: List[str] = []
+
+        observations = img_analysis.get("observations") or []
+        for obs in observations:
+            label = obs.get("observation_label", "")
+            severity = (obs.get("severity") or "normal").lower()
+
+            if label == "ELEVATED_ERYTHEMA_DETECTED":
+                if severity == "moderate":
+                    score += 5
+                elif severity == "mild":
+                    score += 3
+                factors.append("Computer vision observation: elevated localized erythema/redness observed")
+            elif label == "POOR_IMAGE_QUALITY":
+                factors.append("Visual quality notice: attached photograph has insufficient lighting or resolution")
+
+        return min(8, score), factors
 
     def _generate_recommendation(self, risk_level: str, is_emergency: bool) -> str:
         """Generate compassionate, action-oriented, professional clinical recommendations."""

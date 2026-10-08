@@ -41,6 +41,12 @@ class BaseConfig:
     # CORS
     CORS_ORIGINS = os.getenv("CORS_ORIGINS", "*")
 
+    # Media / Image Upload Configuration
+    UPLOAD_FOLDER = os.getenv("UPLOAD_FOLDER", str(BASE_DIR / "uploads"))
+    MAX_CONTENT_LENGTH = int(os.getenv("MAX_CONTENT_LENGTH", str(10 * 1024 * 1024)))  # 10 MB limit
+    ALLOWED_IMAGE_EXTENSIONS = {"jpg", "jpeg", "png", "webp"}
+    ALLOWED_IMAGE_MIMETYPES = {"image/jpeg", "image/png", "image/webp"}
+
 
 class DevelopmentConfig(BaseConfig):
     """Development environment configuration."""
@@ -60,6 +66,7 @@ class TestingConfig(BaseConfig):
     # Shorter expiry for fast testing if needed
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(minutes=15)
     JWT_REFRESH_TOKEN_EXPIRES = timedelta(days=1)
+    UPLOAD_FOLDER = str(BASE_DIR / "test_uploads")
 
 
 class ProductionConfig(BaseConfig):

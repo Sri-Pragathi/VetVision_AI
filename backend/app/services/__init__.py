@@ -8,6 +8,10 @@ from app.services.ai_data_service import AiDataPreparationService
 from app.services.emergency_service import EmergencyAssessmentService
 from app.services.risk_analysis_service import RiskAnalysisService
 from app.services.risk_engine import BaseRiskAnalysisEngine, RuleBasedRiskAnalysisEngine, RiskAnalysisOutput
+# Step 5: Image Analysis & Computer Vision
+from app.services.storage_service import BaseImageStorage, LocalStorageService
+from app.services.cv_engine import BaseImageAnalysisEngine, BasicImageAnalysisEngine, ImageAnalysisOutput
+from app.services.image_analysis_service import ImageAnalysisService
 
 __all__ = [
     "AuthService",
@@ -21,4 +25,10 @@ __all__ = [
     "BaseRiskAnalysisEngine",
     "RuleBasedRiskAnalysisEngine",
     "RiskAnalysisOutput",
+    "BaseImageStorage",
+    "LocalStorageService",
+    "BaseImageAnalysisEngine",
+    "BasicImageAnalysisEngine",
+    "ImageAnalysisOutput",
+    "ImageAnalysisService",
 ]

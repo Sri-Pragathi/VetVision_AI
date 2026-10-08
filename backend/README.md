@@ -337,17 +337,17 @@ The `EmergencyAssessmentService` provides an initial computational safety layer:
 ```bash
 cd backend
 
-# Run all tests (Steps 1, 2, 3, and 4)
+# Run all tests (Steps 1, 2, 3, 4, and 5)
 .\venv\Scripts\pytest -v
 
 # Run with coverage report
 .\venv\Scripts\pytest --cov=app tests/
 ```
 
-**Results (Step 4 Complete):**
-- **90 / 91 tests passing** (1 skipped — text-type question format)
-- **92% Code Coverage** across 2,042 statements
-- **0 regressions** — all Step 1, 2, and 3 tests continue to pass.
+**Results (Step 5 Complete):**
+- **107 / 108 tests passing** (1 skipped — text-type question format)
+- **92% Code Coverage** across 2,510 statements
+- **0 regressions** — all Step 1, 2, 3, and 4 tests continue to pass.
 
 ---
 
@@ -637,7 +637,126 @@ Migration: `migrations/versions/f13704143945_add_step_4_assessment_risk_analyses
 
 ---
 
-## 13. Implementation Roadmap
+---
+
+## 13. Step 5 — Computer Vision / Pet Image Analysis Pipeline
+
+### Overview
+
+Step 5 implements a **secure, explainable Computer Vision pipeline** allowing pet owners and clinical staff to attach pet photographs to health assessments and extract structured visual observations.
+
+```
+Pet Profile
+    ↓
+Health Assessment
+    ↓
+Symptoms + Observations
+    ↓
+Dynamic Follow-up Questions
+    ↓
+Risk Analysis (Step 4)
+    ↓
+Pet Image Upload & Validation
+    ↓
+Computer Vision Quality Gate & Analysis
+    ↓
+Visual Observations Extraction
+    ↓
+Combined AI Assessment / Risk Re-analysis
+```
+
+### Pluggable Architecture
+
+1. **Storage Abstraction (`BaseImageStorage` / `LocalStorageService`)**
+   - Decoupled from physical disk layouts.
+   - Prevents path-traversal attacks by verifying canonical path prefixes.
+   - Generates safe UUID-based storage keys (`assessments/<id>/<uuid>.<ext>`).
+   - Allows seamless drop-in replacement with cloud object storage (e.g. AWS S3, Google Cloud Storage, Azure Blob).
+
+2. **Computer Vision Abstraction (`BaseImageAnalysisEngine` / `BasicImageAnalysisEngine`)**
+   - Clean adapter contract (`BaseImageAnalysisEngine.analyze_image(...) -> ImageAnalysisOutput`).
+   - Standardized output structure with quality metrics, visual observations, and recommendations.
+   - Supports future integration of trained veterinary deep learning models (e.g. PyTorch, YOLOv8, ONNX lesion segmentation) without altering API routes, schemas, or database models.
+
+3. **Image Quality Gate**
+   - Evaluates:
+     - **Resolution:** Gated at minimum 150x150 px.
+     - **Lighting/Luminance:** Detects underexposed (< 35 luminance) and washed-out overexposed (> 240 luminance) images.
+     - **Contrast:** Gated at minimum standard deviation of 12.0.
+     - **Sharpness/Blur:** High-frequency edge density evaluation.
+   - If an image fails the quality gate:
+     - Status: `REQUIRES_BETTER_IMAGE`
+     - Returns actionable guidance (e.g. *"Insufficient lighting"*, *"Image resolution is too low"*).
+     - Does **NOT** draw medical conclusions from poor-quality images.
+
+4. **Visual Observations Model (`ImageObservation`)**
+   - Observations are strictly labeled as computer-vision observations rather than medical diagnoses:
+     - `SUITABLE_FOR_ANALYSIS`: Adequate lighting, resolution, and contrast.
+     - `POOR_IMAGE_QUALITY`: Insufficient lighting or focus.
+     - `ELEVATED_ERYTHEMA_DETECTED`: Prominent localized red-channel concentration (dermatological context).
+     - `STANDARD_COLOR_DISTRIBUTION`: Expected baseline coloration.
+
+---
+
+### Step 5 Database Models
+
+#### `AssessmentImage` (`assessment_images`)
+| Column | Type | Description |
+|---|---|---|
+| `id` | String(36) UUID | Primary key |
+| `assessment_id` | FK → HealthAssessment | Parent assessment (`CASCADE`), indexed |
+| `pet_id` | FK → Pet | Associated pet (`CASCADE`), indexed |
+| `original_filename` | String(255) | Sanitized client filename |
+| `storage_path` | String(500) | Relative storage object key |
+| `mime_type` | String(100) | Validated MIME type (`image/jpeg`, `image/png`, `image/webp`) |
+| `file_size` | Integer | Byte count |
+| `width`, `height` | Integer | Pixel dimensions |
+| `processing_status` | String(30) | `UPLOADED`, `READY`, `ANALYZING`, `ANALYZED`, `FAILED` |
+| `analysis_status` | String(30) | `PENDING`, `ANALYZED`, `REQUIRES_BETTER_IMAGE`, `FAILED` |
+| `quality_gate` | String(30) | `PASSED`, `REQUIRES_BETTER_IMAGE` |
+
+#### `ImageObservation` (`image_observations`)
+| Column | Type | Description |
+|---|---|---|
+| `id` | String(36) UUID | Primary key |
+| `assessment_image_id` | FK → AssessmentImage | Parent image (`CASCADE`), indexed |
+| `observation_type` | String(50) | `visual_quality`, `visual_feature`, `color_profile` |
+| `observation_label` | String(100) | `SUITABLE_FOR_ANALYSIS`, `ELEVATED_ERYTHEMA_DETECTED`, etc. |
+| `severity` | String(20) | `normal`, `mild`, `moderate`, `severe` |
+| `region` | String(100) | `overall_image`, `focal_region` |
+| `description` | Text | Human-readable explanation of visual feature |
+| `source` | String(50) | `computer_vision` |
+| `model_version` | String(50) | `v1.0.0-cv_baseline` |
+
+---
+
+### Step 5 APIs
+
+| Method | Endpoint | Auth | Description |
+|---|---|---|---|
+| `POST` | `/api/v1/assessments/<id>/images` | JWT | Upload pet photo (`multipart/form-data`, max 10MB) |
+| `GET` | `/api/v1/assessments/<id>/images` | JWT | List all photos attached to an assessment |
+| `GET` | `/api/v1/assessment-images/<id>` | JWT | Retrieve metadata and observation status for single photo |
+| `POST` | `/api/v1/assessment-images/<id>/analyze` | JWT | Execute computer vision quality gating and observation extraction |
+| `GET` | `/api/v1/assessment-images/<id>/analysis` | JWT | Retrieve structured CV observations and quality metrics |
+| `DELETE` | `/api/v1/assessment-images/<id>` | JWT | Delete photo from storage and database (cascade cleanup) |
+
+---
+
+### Integration with Step 4 Risk Engine & Safety
+
+1. **`AiDataPreparationService`:**
+   - Injects `image_analysis` section into payload with `images_count`, `analyzed_count`, and structured visual observations.
+2. **`RuleBasedRiskAnalysisEngine`:**
+   - Consumes visual features safely (e.g. localized erythema adds correlated factor, maximum +8 points).
+   - Image existence alone never artificially inflates risk score.
+   - **Emergency conditions are NEVER downgraded** by attached images.
+3. **Mandatory Clinical Safety Disclaimer:**
+   > *"This image analysis provides computational computer-vision observations for early-warning support and does not replace professional veterinary examination or diagnosis."*
+
+---
+
+## 14. Implementation Roadmap
 
 | Step | Description | Status |
 |---|---|---|
@@ -645,6 +764,7 @@ Migration: `migrations/versions/f13704143945_add_step_4_assessment_risk_analyses
 | **Step 2** | Pet Health Assessment — Symptoms, Observations, Notes, AI Data Prep | ✅ Complete |
 | **Step 3** | Dynamic Question Engine — Follow-Up Q&A, Emergency Triage, Conditional Logic | ✅ Complete |
 | **Step 4** | AI Health Risk Analysis Engine — Explainable Scoring, Emergency Hard-Stop, ML Adapter | ✅ Complete |
-| **Step 5** | Image Analysis Pipeline — Computer Vision & Lesion Detection | 🔜 Next |
-| **Step 6** | Veterinary Report Generation — PDF / Exportable Clinical Summaries | 🔜 Future |
+| **Step 5** | Image Analysis Pipeline — Computer Vision Quality Gate, Observations & ML Adapter | ✅ Complete |
+| **Step 6** | Veterinary Report Generation — PDF / Exportable Clinical Summaries | 🔜 Next |
+
 

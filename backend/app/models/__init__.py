@@ -13,6 +13,8 @@ from app.models.assessment_answer import AssessmentAnswer
 from app.models.question_bank import seed_follow_up_questions
 # Step 4: Health Risk Analysis Engine
 from app.models.risk_analysis import AssessmentRiskAnalysis
+# Step 5: Computer Vision Image Analysis
+from app.models.assessment_image import AssessmentImage, ImageObservation
 
 __all__ = [
     "User",
@@ -32,4 +34,7 @@ __all__ = [
     "seed_follow_up_questions",
     # Step 4
     "AssessmentRiskAnalysis",
+    # Step 5
+    "AssessmentImage",
+    "ImageObservation",
 ]
