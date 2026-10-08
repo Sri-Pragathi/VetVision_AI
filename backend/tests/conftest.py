@@ -3,6 +3,7 @@ import pytest
 from app import create_app
 from app.extensions import db
 from app.models.symptom import seed_symptoms
+from app.models.question_bank import seed_follow_up_questions
 
 
 @pytest.fixture(scope="session")
@@ -25,8 +26,9 @@ def client(app):
             for table in reversed(db.metadata.sorted_tables):
                 db.session.execute(table.delete())
             db.session.commit()
-            # Seed standard symptom vocabulary
+            # Seed standard symptom vocabulary and question bank
             seed_symptoms()
+            seed_follow_up_questions()
         yield test_client
 
 

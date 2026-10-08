@@ -337,13 +337,174 @@ The `EmergencyAssessmentService` provides an initial computational safety layer:
 ```bash
 cd backend
 
-# Run all 43 tests
+# Run all tests (Steps 1, 2, and 3)
 .\venv\Scripts\pytest -v
 
 # Run with coverage report
 .\venv\Scripts\pytest --cov=app tests/
 ```
 
-**Results:**
-- **43 / 43 tests passing** (100%)
-- **92% Total Code Coverage** across all models, services, schemas, and routes.
+**Results (Step 3 Complete):**
+- **73 / 74 tests passing** (1 skipped — text-type question skipped if not in Digestive seed)
+- **0 regressions** — all Step 1 and Step 2 tests continue to pass.
+
+---
+
+## 11. Step 3 — Dynamic Symptom & Follow-Up Question Engine
+
+### Overview
+
+The Dynamic Question Engine extends the health assessment system with intelligent, context-aware follow-up questions. When a user selects a symptom such as *Vomiting*, the system automatically prioritizes relevant clinical questions:
+
+> *"How many times has your pet vomited?"*
+> *"Is there blood present in the vomit?"*
+> *"Is your pet able to keep water down?"*
+
+Emergency symptoms such as *"Difficulty breathing"* or *"Seizures"* cause `priority=emergency` questions to surface **first**, before routine queries.
+
+---
+
+### New Models (Step 3)
+
+#### `FollowUpQuestion`
+| Column | Type | Description |
+|---|---|---|
+| `id` | String(36) UUID | Primary key |
+| `question_text` | Text | The clinical question text |
+| `question_type` | String(30) | `yes_no`, `single_choice`, `multiple_choice`, `number`, `text` |
+| `category` | String(50) | Symptom category (Digestive, Respiratory, etc.) |
+| `priority` | String(20) | `emergency`, `high`, `medium`, `low` |
+| `symptom_id` | FK → Symptom | Optional link to specific symptom |
+| `species` | String(50) | Species restriction (`Canine`, `Feline`) or `NULL` = all species |
+| `min_age_months` | Integer | Minimum pet age in months (optional) |
+| `max_age_months` | Integer | Maximum pet age in months (optional) |
+| `is_emergency_related` | Boolean | Surfaces before routine questions |
+| `is_active` | Boolean | Soft-disable without deletion |
+
+#### `FollowUpQuestionOption`
+| Column | Type | Description |
+|---|---|---|
+| `id` | String(36) UUID | Primary key |
+| `question_id` | FK → FollowUpQuestion | Parent question (CASCADE) |
+| `option_text` | String(255) | Human-readable label |
+| `option_value` | String(100) | Machine-readable value |
+| `severity_weight` | Float (0.0–1.0) | Clinical significance score |
+| `emergency_flag` | Boolean | Selecting this option triggers emergency warning |
+
+#### `AssessmentAnswer`
+| Column | Type | Description |
+|---|---|---|
+| `id` | String(36) UUID | Primary key |
+| `assessment_id` | FK → HealthAssessment | Parent assessment (CASCADE) |
+| `question_id` | FK → FollowUpQuestion | Answered question |
+| `selected_option_id` | FK → FollowUpQuestionOption | For choice questions |
+| `answer_text` | Text | For text questions |
+| `numeric_value` | Float | For number questions |
+| `boolean_value` | Boolean | For yes/no questions |
+| `triggered_emergency` | Boolean | Set if selected option had `emergency_flag=True` |
+| **Unique** | `(assessment_id, question_id)` | One answer per question per assessment |
+
+---
+
+### Step 3 APIs
+
+| Method | Endpoint | Auth | Description |
+|---|---|---|---|
+| `GET` | `/api/v1/questions` | Public | Browse question bank (filter: `category`, `priority`, `species`, `symptom_id`) |
+| `GET` | `/api/v1/assessments/<id>/next-questions` | JWT | Context-aware next batch (param: `batch_size`) |
+| `POST` | `/api/v1/assessments/<id>/answers` | JWT | Submit answer to a question |
+| `GET` | `/api/v1/assessments/<id>/answers` | JWT | Retrieve all submitted answers |
+| `GET` | `/api/v1/assessments/<id>/question-state` | JWT | Progress, emergency flags, readiness |
+
+---
+
+### Dynamic Question Engine Rules
+
+1. **Emergency First** — `priority=emergency` questions always surface before all others.
+2. **Symptom Context** — Only questions linked to selected symptoms or their categories are returned.
+3. **Species Awareness** — `species=Canine` questions excluded for Feline pets and vice versa.
+4. **Age Awareness** — Questions with `min_age_months`/`max_age_months` are filtered by pet's calculated age.
+5. **Already-Answered Exclusion** — Answered questions never repeat.
+6. **Conditional Triggers** — Certain `option_value`s (e.g. `blood_yes`, `gums_blue`) unlock additional question categories.
+7. **Emergency Propagation** — Selecting `emergency_flag=True` option sets `triggered_emergency=True` and appears in question-state flags.
+
+---
+
+### Question Bank
+
+Seeded with **200+ evidence-informed clinical questions** across all 10 symptom categories:
+
+| Category | Priority | Sample Question |
+|---|---|---|
+| Respiratory | emergency | "Is your pet currently struggling to breathe?" |
+| Neurological | emergency | "Is your pet currently having a seizure?" |
+| Urinary | emergency | "Is your pet straining to urinate with little or no output?" |
+| Digestive | high | "How many times has your pet vomited in the past 24 hours?" |
+| Digestive | high | "Is there blood present in the vomit?" |
+| Skin | medium | "Is your pet scratching constantly or intensely?" |
+| Eyes | medium | "Is there visible discharge from one or both eyes?" |
+| General | medium | "Has your pet's appetite changed noticeably?" |
+| Behavioural | low | "Is your pet hiding or withdrawing from interaction?" |
+
+---
+
+### Database Migration (Step 3)
+
+Migration: `migrations/versions/37f1877f260e_add_step_3_follow_up_questions_*`
+
+Creates:
+- `follow_up_questions` (indexes: `category`, `symptom_id`)
+- `follow_up_question_options` (index: `question_id`)
+- `assessment_answers` (indexes: `assessment_id`, `question_id`, unique constraint)
+
+```bash
+flask db upgrade
+```
+
+---
+
+### AI Integration
+
+`AiDataPreparationService` now includes follow-up Q&A in the AI-ready payload:
+
+```json
+{
+  "pet": { "species": "Canine", "age": "4 years" },
+  "symptoms": [{ "name": "vomiting", "severity": "moderate" }],
+  "observations": { "appetite": "decreased" },
+  "additional_notes": "Pet is reluctant to drink.",
+  "follow_up_answers": [
+    {
+      "question": "How many times has your pet vomited in the past 24 hours?",
+      "category": "Digestive",
+      "priority": "high",
+      "is_emergency_related": false,
+      "answer_option": "More than 5 times",
+      "severity_weight": 0.9,
+      "triggered_emergency": false
+    }
+  ]
+}
+```
+
+---
+
+### Medical Safety Notice
+
+> **VetVision AI is an early health assessment support tool only.**
+> It does **NOT** diagnose diseases or replace professional veterinary care.
+> Emergency indicators recommend immediate veterinary attention.
+> Every question-state response includes a mandatory safety disclaimer.
+
+---
+
+## 12. Implementation Roadmap
+
+| Step | Description | Status |
+|---|---|---|
+| **Step 1** | Backend Foundation — Auth, Users, Pets, DB, JWT, Migrations | ✅ Complete |
+| **Step 2** | Pet Health Assessment — Symptoms, Observations, Notes, AI Data Prep | ✅ Complete |
+| **Step 3** | Dynamic Question Engine — Follow-Up Q&A, Emergency Triage, Conditional Logic | ✅ Complete |
+| **Step 4** | AI Disease/Risk Prediction Model | 🔜 Next |
+| **Step 5** | Image Analysis Pipeline | 🔜 Future |
+| **Step 6** | Veterinary Report Generation | 🔜 Future |

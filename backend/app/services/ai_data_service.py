@@ -76,9 +76,48 @@ class AiDataPreparationService:
         if assessment.notes:
             combined_notes = "\n".join([n.note for n in assessment.notes if n.note])
 
+        # 5. Step 3: Dynamic Follow-Up Question Answers
+        #    Provides structured Q&A context to the downstream AI model.
+        follow_up_answers: List[Dict[str, Any]] = []
+        try:
+            from app.models.assessment_answer import AssessmentAnswer
+            answers = (
+                AssessmentAnswer.query
+                .filter_by(assessment_id=assessment.id)
+                .order_by(AssessmentAnswer.created_at.asc())
+                .all()
+            )
+            for ans in answers:
+                q = ans.question
+                follow_up_answers.append({
+                    "question": q.question_text if q else None,
+                    "category": q.category if q else None,
+                    "priority": q.priority if q else None,
+                    "is_emergency_related": q.is_emergency_related if q else False,
+                    "question_type": q.question_type if q else None,
+                    "answer_option": (
+                        ans.selected_option.option_text if ans.selected_option else None
+                    ),
+                    "answer_option_value": (
+                        ans.selected_option.option_value if ans.selected_option else None
+                    ),
+                    "answer_text": ans.answer_text,
+                    "numeric_value": ans.numeric_value,
+                    "boolean_value": ans.boolean_value,
+                    "triggered_emergency": ans.triggered_emergency,
+                    "severity_weight": (
+                        ans.selected_option.severity_weight
+                        if ans.selected_option else None
+                    ),
+                })
+        except Exception:
+            # Gracefully degrade if the answers table is unavailable
+            follow_up_answers = []
+
         return {
             "pet": pet_profile,
             "symptoms": symptoms_list,
             "observations": observations_data,
             "additional_notes": combined_notes,
+            "follow_up_answers": follow_up_answers,
         }
