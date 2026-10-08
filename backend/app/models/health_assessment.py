@@ -95,6 +95,14 @@ class HealthAssessment(db.Model):
         order_by="AssessmentImage.created_at.asc()",
     )
 
+    reports = db.relationship(
+        "AssessmentReport",
+        back_populates="assessment",
+        cascade="all, delete-orphan",
+        lazy="select",
+        order_by="AssessmentReport.report_version.desc()",
+    )
+
     def complete(self) -> None:
         """Mark assessment as completed and set completion timestamp."""
         self.status = self.STATUS_COMPLETED

@@ -50,6 +50,14 @@ from app.schemas.image_schema import (
     image_observation_response_schema,
     image_observations_response_schema,
 )
+from app.schemas.report_schema import (
+    AssessmentReportResponseSchema,
+    AssessmentReportSummarySchema,
+    assessment_report_response_schema,
+    assessment_reports_response_schema,
+    assessment_report_summary_schema,
+    assessment_reports_summary_schema,
+)
 
 __all__ = [
     "RegisterSchema",
@@ -91,4 +99,10 @@ __all__ = [
     "assessment_images_response_schema",
     "image_observation_response_schema",
     "image_observations_response_schema",
+    "AssessmentReportResponseSchema",
+    "AssessmentReportSummarySchema",
+    "assessment_report_response_schema",
+    "assessment_reports_response_schema",
+    "assessment_report_summary_schema",
+    "assessment_reports_summary_schema",
 ]

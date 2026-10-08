@@ -15,6 +15,8 @@ from app.models.question_bank import seed_follow_up_questions
 from app.models.risk_analysis import AssessmentRiskAnalysis
 # Step 5: Computer Vision Image Analysis
 from app.models.assessment_image import AssessmentImage, ImageObservation
+# Step 6: Veterinary Report & Explainable Health Summary
+from app.models.assessment_report import AssessmentReport
 
 __all__ = [
     "User",
@@ -37,4 +39,6 @@ __all__ = [
     # Step 5
     "AssessmentImage",
     "ImageObservation",
+    # Step 6
+    "AssessmentReport",
 ]

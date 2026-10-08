@@ -13,6 +13,8 @@ from app.routes.answer_routes import answer_bp
 from app.routes.risk_analysis_routes import risk_analysis_bp
 # Step 5: Computer Vision Image Analysis
 from app.routes.image_routes import image_bp
+# Step 6: Veterinary Report & Explainable Health Summary
+from app.routes.report_routes import assessment_report_bp, report_bp
 
 
 def register_routes(app: Flask) -> None:
@@ -33,6 +35,9 @@ def register_routes(app: Flask) -> None:
     api_v1.register_blueprint(risk_analysis_bp)
     # Step 5
     api_v1.register_blueprint(image_bp)
+    # Step 6
+    api_v1.register_blueprint(assessment_report_bp)
+    api_v1.register_blueprint(report_bp)
 
     # Register root v1 blueprint with main app
     app.register_blueprint(api_v1)

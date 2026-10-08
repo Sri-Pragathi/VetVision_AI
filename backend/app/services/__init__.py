@@ -13,6 +13,10 @@ from app.services.storage_service import BaseImageStorage, LocalStorageService
 from app.services.cv_engine import BaseImageAnalysisEngine, BasicImageAnalysisEngine, ImageAnalysisOutput
 from app.services.image_analysis_service import ImageAnalysisService
 
+# Step 6: Veterinary Report & Explainable Health Summary
+from app.services.report_html_renderer import ReportHtmlRenderer
+from app.services.report_service import ReportService
+
 __all__ = [
     "AuthService",
     "UserService",
@@ -31,4 +35,6 @@ __all__ = [
     "BasicImageAnalysisEngine",
     "ImageAnalysisOutput",
     "ImageAnalysisService",
+    "ReportHtmlRenderer",
+    "ReportService",
 ]
