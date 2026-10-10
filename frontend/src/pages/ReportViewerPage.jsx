@@ -540,32 +540,90 @@ DISCLAIMER: VetVision AI is an AI-assisted triage and early-warning tool, not a 
               {images.length === 0 || images[0].status === 'NOT_PROVIDED' ? (
                 <div style={{ color: 'var(--color-text-muted)' }}>
                   No pet photographs were uploaded during this assessment. Visual analysis was omitted.
+                  <div style={{ fontSize: '0.8rem', marginTop: '0.35rem', color: '#64748b' }}>
+                    * Omission of pet photos does not imply the absence of physical or dermatological abnormalities.
+                  </div>
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  {images.map((img, idx) => (
-                    <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
-                      <div>
-                        <div style={{ fontWeight: 600 }}>Inspection Image #{idx + 1}</div>
-                        <div style={{ color: 'var(--color-text-muted)', fontSize: '0.8rem' }}>
-                          Status: {img.status} • Quality Gate: {img.quality_gate || 'EVALUATED'}
-                        </div>
-                        <div style={{ marginTop: '0.25rem' }}>{img.findings_summary}</div>
-                      </div>
-                      <span
+                  {images.map((img, idx) => {
+                    const isPassed = img.quality?.check_passed === true || img.quality_gate === 'PASSED';
+                    const qMetrics = img.quality?.quality_metrics;
+
+                    return (
+                      <div
+                        key={idx}
                         style={{
-                          fontSize: '0.75rem',
-                          fontWeight: 700,
-                          padding: '0.2rem 0.5rem',
-                          borderRadius: 'var(--radius-sm)',
-                          backgroundColor: img.quality?.check_passed ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-                          color: img.quality?.check_passed ? 'var(--color-success)' : 'var(--color-danger)',
+                          padding: '1rem',
+                          borderRadius: 'var(--radius-md)',
+                          backgroundColor: isPassed ? 'white' : '#fffbeb',
+                          border: `1px solid ${isPassed ? 'var(--color-border)' : '#fde68a'}`,
                         }}
                       >
-                        Gate: {img.quality?.check_passed ? 'PASSED' : 'LOW RESOLUTION'}
-                      </span>
-                    </div>
-                  ))}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '0.5rem' }}>
+                          <div>
+                            <div style={{ fontWeight: 600, color: 'var(--color-text-main)' }}>Inspection Image #{idx + 1}</div>
+                            <div style={{ color: 'var(--color-text-muted)', fontSize: '0.8rem' }}>
+                              Status: {img.status} • Quality Gate: {img.quality_gate || 'EVALUATED'}
+                            </div>
+                          </div>
+                          <span
+                            style={{
+                              fontSize: '0.75rem',
+                              fontWeight: 700,
+                              padding: '0.2rem 0.55rem',
+                              borderRadius: 'var(--radius-sm)',
+                              backgroundColor: isPassed ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                              color: isPassed ? 'var(--color-success)' : 'var(--color-danger)',
+                            }}
+                          >
+                            Gate: {isPassed ? 'PASSED' : 'REQUIRES BETTER PHOTO'}
+                          </span>
+                        </div>
+
+                        {/* If quality gate failed: display warning and actionable tip */}
+                        {!isPassed && (
+                          <div style={{ fontSize: '0.8rem', color: '#92400e', marginBottom: '0.5rem' }}>
+                            <div><strong>Quality Advisory:</strong> {img.quality_warnings || img.quality?.warning || 'Image quality insufficient for reliable feature inspection.'}</div>
+                            {img.actionable_guidance && (
+                              <div style={{ marginTop: '0.25rem', color: '#78350f' }}>
+                                💡 <strong>Actionable Tip:</strong> {img.actionable_guidance}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Quality Metrics */}
+                        {qMetrics && (
+                          <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginBottom: '0.5rem', fontSize: '0.75rem' }}>
+                            {qMetrics.width && (
+                              <span style={{ padding: '0.15rem 0.4rem', backgroundColor: '#f1f5f9', borderRadius: '4px', color: '#475569' }}>
+                                {qMetrics.width}x{qMetrics.height}px
+                              </span>
+                            )}
+                            {qMetrics.is_well_lit !== undefined && (
+                              <span style={{ padding: '0.15rem 0.4rem', backgroundColor: qMetrics.is_well_lit ? '#ecfdf5' : '#fef2f2', borderRadius: '4px', color: qMetrics.is_well_lit ? '#065f46' : '#991b1b' }}>
+                                Lighting: {qMetrics.is_well_lit ? 'Balanced' : 'Sub-optimal'}
+                              </span>
+                            )}
+                            {qMetrics.is_sharp !== undefined && (
+                              <span style={{ padding: '0.15rem 0.4rem', backgroundColor: qMetrics.is_sharp ? '#ecfdf5' : '#fef2f2', borderRadius: '4px', color: qMetrics.is_sharp ? '#065f46' : '#991b1b' }}>
+                                Focus: {qMetrics.is_sharp ? 'In Focus' : 'Blurry'}
+                              </span>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Findings summary and disclaimer */}
+                        <div style={{ fontSize: '0.825rem', color: 'var(--color-text-main)' }}>
+                          {img.findings_summary}
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', fontStyle: 'italic', marginTop: '0.35rem' }}>
+                          * Computational computer-vision observation; does not replace direct clinical veterinary examination.
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>

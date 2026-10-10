@@ -18,8 +18,9 @@ class ImageAnalysisOutput:
     quality_metrics: Dict[str, Any] = field(default_factory=dict)
     visual_observations: List[Dict[str, Any]] = field(default_factory=list)
     reasons: List[str] = field(default_factory=list)
+    actionable_guidance: List[str] = field(default_factory=list)
     recommendation: str = ""
-    engine_version: str = "v1.0.0-cv_baseline"
+    engine_version: str = "v1.1.0-cv_reliability"
     disclaimer: str = (
         "This image analysis provides computational computer-vision observations "
         "for early-warning support and does not replace professional veterinary "
@@ -35,6 +36,7 @@ class ImageAnalysisOutput:
             "quality_metrics": self.quality_metrics,
             "visual_observations": self.visual_observations,
             "reasons": self.reasons,
+            "actionable_guidance": self.actionable_guidance,
             "recommendation": self.recommendation,
             "engine_version": self.engine_version,
             "disclaimer": self.disclaimer,

@@ -98,7 +98,13 @@ VetVision_AI/
 - **Data Quality & Contradiction Detection**: `QualityChecker` flags conflicting clinical observations, chronicity anomalies (e.g., symptom duration exceeding pet age), and poor/missing photo quality gates.
 - **Granular Explainability Attribution**: `StructuredFactor` models provide exact source attribution, clinical direction (`risk-increasing`, `reassuring`, `unknown`, `emergency override`), applied rules, and verified contribution points.
 - **Emergency Hard-Stop Integrity**: Authoritative floor of 90 points and immediate triage emergency hard-stop cannot be downgraded or discounted by secondary findings.
-- **Immutable Audit Trail**: Zero schema migrations required; complete structured factor trees and data quality warnings stored within the versioned clinical snapshot.
+### ✅ Step 8B — Enhanced Computer Vision & Image Analysis Reliability
+- **Deterministic Quality Metrics**: High-accuracy deterministic computer-vision checks for edge sharpness/blur (`edge_energy`, `edge_max`), luminance/brightness (`[35.0, 240.0]`), contrast (`MIN_CONTRAST = 12.0`), resolution (`MIN_DIMENSION = 150px`), and aspect ratio distortion (`[0.2, 5.0]`).
+- **Actionable Quality Feedback**: Real-time user guidance on camera stability, ambient room lighting, capture distance, and lens angle for any rejected photo.
+- **Measurable Visual Observations vs. Diagnostic Limitations**: Clearly documents detectable chromatic/color distribution features (e.g., localized erythema chromatic shift) with explicit disclaimers that basic image processing cannot diagnose clinical diseases.
+- **Duplicate Evidence Prevention**: Prevents double-counting when owners upload multiple photos of the same lesion or when photographic erythema corroborates an already-reported skin symptom (modulated +2 pts instead of uncoupled +5 pts).
+- **Missing/Failed Photo Safety**: Unanalyzed or rejected photos are recorded as `UNKNOWN` with zero risk points and never imply a clean bill of health.
+- **Emergency Floor Inviolability**: A visually normal photograph can never cancel, discount, or delay care for critical clinical symptoms.
 
 ---
 

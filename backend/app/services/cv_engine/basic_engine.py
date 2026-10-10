@@ -18,13 +18,16 @@ class BasicImageAnalysisEngine(BaseImageAnalysisEngine):
     - Color spectrum / erythema ratio analysis for dermatological context
     """
 
-    ENGINE_VERSION = "v1.0.0-cv_baseline"
+    ENGINE_VERSION = "v1.1.0-cv_reliability"
 
     # Quality Gate Thresholds
     MIN_DIMENSION = 150
-    MIN_LUMINANCE = 35.0   # Underexposed / too dark
-    MAX_LUMINANCE = 240.0  # Overexposed / washed out
-    MIN_CONTRAST = 12.0    # Flat / lacking detail
+    MIN_LUMINANCE = 35.0    # Underexposed / too dark
+    MAX_LUMINANCE = 240.0   # Overexposed / washed out
+    MIN_CONTRAST = 12.0     # Flat / lacking detail
+    MIN_EDGE_SHARPNESS = 1.8# Out of focus / motion blur
+    MIN_ASPECT_RATIO = 0.2  # Extreme vertical distortion
+    MAX_ASPECT_RATIO = 5.0  # Extreme horizontal distortion
 
     @property
     def version(self) -> str:
@@ -40,6 +43,7 @@ class BasicImageAnalysisEngine(BaseImageAnalysisEngine):
                 quality_gate="FAILED",
                 quality_score=0.0,
                 reasons=["Image file not found on storage"],
+                actionable_guidance=["Please re-upload the pet image from your local device."],
                 recommendation="Please re-upload the pet image.",
                 engine_version=self.ENGINE_VERSION,
             )
@@ -68,6 +72,8 @@ class BasicImageAnalysisEngine(BaseImageAnalysisEngine):
             edges = gray_img.filter(ImageFilter.FIND_EDGES)
             edge_stat = ImageStat.Stat(edges)
             edge_energy = edge_stat.mean[0]
+            edge_extrema = edges.getextrema()
+            edge_max = edge_extrema[1] if isinstance(edge_extrema, tuple) else 0
 
             # Color profile analysis
             rgb_stat = ImageStat.Stat(rgb_img)
@@ -80,6 +86,7 @@ class BasicImageAnalysisEngine(BaseImageAnalysisEngine):
                 quality_gate="FAILED",
                 quality_score=0.0,
                 reasons=[f"Unable to decode image file: {str(e)}"],
+                actionable_guidance=["Please ensure the image file is not corrupted and try again."],
                 recommendation="Please ensure the image file is not corrupted and try again.",
                 engine_version=self.ENGINE_VERSION,
             )
@@ -88,34 +95,73 @@ class BasicImageAnalysisEngine(BaseImageAnalysisEngine):
         # Quality Gate Evaluation
         # -------------------------------------------------------------------
         reasons: List[str] = []
+        actionable_guidance: List[str] = []
+
+        aspect_ratio = round(width / max(1, height), 2)
+        is_sufficient_res = width >= self.MIN_DIMENSION and height >= self.MIN_DIMENSION
+        is_well_lit = self.MIN_LUMINANCE <= mean_luminance <= self.MAX_LUMINANCE
+        is_sufficient_contrast = contrast_std >= self.MIN_CONTRAST
+        # Image is sharp if edge energy is above threshold or maximum gradient is pronounced
+        is_sharp = edge_energy >= self.MIN_EDGE_SHARPNESS or edge_max >= 160
+        is_balanced_aspect = self.MIN_ASPECT_RATIO <= aspect_ratio <= self.MAX_ASPECT_RATIO
 
         # 1. Dimension Check
-        if width < self.MIN_DIMENSION or height < self.MIN_DIMENSION:
+        if not is_sufficient_res:
             reasons.append(
                 f"Image resolution is too low ({width}x{height}px; minimum {self.MIN_DIMENSION}x{self.MIN_DIMENSION}px required)"
+            )
+            actionable_guidance.append(
+                "Move closer to your pet or use higher camera resolution so physical details are clearly visible."
             )
 
         # 2. Lighting Check
         if mean_luminance < self.MIN_LUMINANCE:
             reasons.append("Insufficient lighting (image is too dark for reliable visual assessment)")
+            actionable_guidance.append(
+                "Improve lighting: turn on indoor lights or move near a window to illuminate the pet's area of concern."
+            )
         elif mean_luminance > self.MAX_LUMINANCE:
-            reasons.append("Overexposed (image is too bright or washed out)")
+            reasons.append("Overexposed (image is too bright or washed out by direct light/flash)")
+            actionable_guidance.append(
+                "Avoid direct harsh flash or intense glare; capture the photo in balanced ambient lighting."
+            )
 
         # 3. Contrast Check
-        if contrast_std < self.MIN_CONTRAST:
-            reasons.append("Low visual contrast (image lacks distinct discernible features)")
+        if not is_sufficient_contrast:
+            reasons.append("Low visual contrast (image lacks distinct discernible features or visual detail)")
+            actionable_guidance.append(
+                "Ensure the pet and affected area are clearly centered and distinct from the background."
+            )
+
+        # 4. Blur / Sharpness Check
+        if not is_sharp:
+            reasons.append("Excessive blur detected (image lacks sharp edge definition or camera lost focus)")
+            actionable_guidance.append(
+                "Hold the camera steady or rest your hands on a stable surface. Tap your screen to focus directly on the affected area before taking the photo."
+            )
+
+        # 5. Aspect Ratio Distortion Check
+        if not is_balanced_aspect:
+            reasons.append(f"Extreme aspect ratio distortion ({width}x{height}px)")
+            actionable_guidance.append(
+                "Capture with standard photographic framing rather than an extreme crop or panoramic ratio."
+            )
 
         # Quality metrics dictionary
         quality_metrics = {
             "width": width,
             "height": height,
             "format": img_format,
-            "aspect_ratio": round(width / max(1, height), 2),
+            "aspect_ratio": aspect_ratio,
             "mean_luminance": round(mean_luminance, 1),
             "contrast_std": round(contrast_std, 1),
-            "edge_energy": round(edge_energy, 1),
-            "is_well_lit": self.MIN_LUMINANCE <= mean_luminance <= self.MAX_LUMINANCE,
-            "is_sufficient_resolution": width >= self.MIN_DIMENSION and height >= self.MIN_DIMENSION,
+            "edge_energy": round(edge_energy, 2),
+            "edge_max": edge_max,
+            "is_well_lit": is_well_lit,
+            "is_sufficient_resolution": is_sufficient_res,
+            "is_sufficient_contrast": is_sufficient_contrast,
+            "is_sharp": is_sharp,
+            "is_balanced_aspect_ratio": is_balanced_aspect,
         }
 
         # If any quality check fails, return REQUIRES_BETTER_IMAGE
@@ -131,18 +177,25 @@ class BasicImageAnalysisEngine(BaseImageAnalysisEngine):
                 ),
                 "source": "computer_vision",
                 "model_version": self.ENGINE_VERSION,
+                "extra_data": {
+                    "reasons": reasons,
+                    "actionable_guidance": actionable_guidance,
+                    "quality_metrics": quality_metrics,
+                },
             }
+            combined_rec = (
+                "Please take a new photo following these recommendations: "
+                + " ".join(actionable_guidance)
+            )
             return ImageAnalysisOutput(
                 status="REQUIRES_BETTER_IMAGE",
                 quality_gate="REQUIRES_BETTER_IMAGE",
-                quality_score=round(max(0.1, 0.4 - len(reasons) * 0.1), 2),
+                quality_score=round(max(0.1, 0.4 - len(reasons) * 0.08), 2),
                 quality_metrics=quality_metrics,
                 visual_observations=[poor_obs],
                 reasons=reasons,
-                recommendation=(
-                    "Please take a new photo in good lighting, ensuring the pet and any affected "
-                    "areas are clearly centered and in sharp focus."
-                ),
+                actionable_guidance=actionable_guidance,
+                recommendation=combined_rec,
                 engine_version=self.ENGINE_VERSION,
             )
 
@@ -160,26 +213,32 @@ class BasicImageAnalysisEngine(BaseImageAnalysisEngine):
             "region": "overall_image",
             "description": (
                 "Image demonstrates adequate resolution, balanced lighting, "
-                "and sufficient contrast for visual inspection."
+                "sufficient contrast, and sharp focus for visual inspection."
             ),
             "source": "computer_vision",
             "model_version": self.ENGINE_VERSION,
+            "extra_data": {
+                "measured_feature": "Resolution, lighting, contrast, and edge sharpness verified",
+                "clinical_note": "Quality criteria met for computational feature screening.",
+            },
         })
 
         # 2. Color Profile / Dermatological Observation
-        # Check clinical context if symptoms relate to skin, coat, or redness
         context = context or {}
         has_skin_context = any(
             "skin" in str(sym.get("category", "")).lower()
             or "skin" in str(sym.get("name", "")).lower()
             or "red" in str(sym.get("name", "")).lower()
+            or "itch" in str(sym.get("name", "")).lower()
+            or "rash" in str(sym.get("name", "")).lower()
             for sym in context.get("symptoms", [])
         )
 
         if erythema_ratio > 0.85:
             obs_desc = (
-                "Computer vision color profile detected prominent red-channel hues, "
-                "consistent with possible localized erythema, inflammation, or irritation."
+                f"Computer vision chromatic inspection detected elevated red-channel distribution (ratio: {erythema_ratio:.2f}). "
+                "Visual redness may correspond to localized superficial inflammation, abrasion, or irritation, "
+                "but represents an image-processing measurement rather than a definitive veterinary diagnosis."
             )
             if has_skin_context:
                 obs_desc += " Coincides with reported dermatological symptoms."
@@ -192,6 +251,12 @@ class BasicImageAnalysisEngine(BaseImageAnalysisEngine):
                 "description": obs_desc,
                 "source": "computer_vision",
                 "model_version": self.ENGINE_VERSION,
+                "extra_data": {
+                    "measured_feature": f"Red-channel to green/blue chromatic ratio: {erythema_ratio:.2f} (baseline expectation: < 0.85)",
+                    "clinical_note": "Superficial redness may correlate with localized dermatological inflammation or irritation. In-person veterinary examination is required for differential diagnosis.",
+                    "erythema_ratio": round(erythema_ratio, 2),
+                    "has_skin_symptom_context": has_skin_context,
+                },
             })
         else:
             observations.append({
@@ -200,11 +265,16 @@ class BasicImageAnalysisEngine(BaseImageAnalysisEngine):
                 "severity": "normal",
                 "region": "overall_image",
                 "description": (
-                    "Visual color distribution falls within expected baseline parameters "
-                    "without prominent localized chromic anomalies."
+                    "Visual chromatic distribution falls within expected baseline parameters without localized discoloration. "
+                    "Note: Standard coloration does not rule out non-visual dermatological conditions, microscopic parasites, or internal discomfort."
                 ),
                 "source": "computer_vision",
                 "model_version": self.ENGINE_VERSION,
+                "extra_data": {
+                    "measured_feature": f"Color balance within expected spectrum (erythema ratio: {erythema_ratio:.2f})",
+                    "clinical_note": "Normal coloration at visual resolution does not rule out underlying dermatological or systemic conditions.",
+                    "erythema_ratio": round(erythema_ratio, 2),
+                },
             })
 
         return ImageAnalysisOutput(
@@ -214,6 +284,7 @@ class BasicImageAnalysisEngine(BaseImageAnalysisEngine):
             quality_metrics=quality_metrics,
             visual_observations=observations,
             reasons=[],
+            actionable_guidance=[],
             recommendation=(
                 "Image successfully verified. Visual observations have been added "
                 "to the health assessment context."

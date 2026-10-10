@@ -687,8 +687,11 @@ class EvidenceNormalizer:
         for idx, obs in enumerate(observations):
             label = obs.get("observation_label", "")
             sev = (obs.get("severity") or "normal").lower()
+            extra = obs.get("extra_data") or {}
 
             if label == "POOR_IMAGE_QUALITY":
+                reasons = extra.get("reasons") or []
+                disp = "Photo quality gate failed: " + ("; ".join(reasons) if reasons else "insufficient resolution, lighting, or focus")
                 item = EvidenceItem(
                     id=f"img_obs_{idx}_poor_quality",
                     source=EvidenceSource.IMAGE_CV,
@@ -696,9 +699,10 @@ class EvidenceNormalizer:
                     category="visual_inspection",
                     name="Image Quality Gate",
                     raw_value=obs,
-                    display_value="Attached photo has insufficient resolution/lighting for diagnostic inspection",
+                    display_value=disp,
                     direction=EvidenceDirection.UNKNOWN,
                     notes="Poor image quality cannot confirm or rule out visual symptoms",
+                    details={"severity": sev, **extra},
                 )
             elif label == "ELEVATED_ERYTHEMA_DETECTED":
                 item = EvidenceItem(
@@ -710,7 +714,7 @@ class EvidenceNormalizer:
                     raw_value=obs,
                     display_value=f"Elevated localized erythema detected by computer vision ({sev})",
                     direction=EvidenceDirection.RISK_INCREASING,
-                    details={"severity": sev},
+                    details={"severity": sev, **extra},
                 )
             else:
                 item = EvidenceItem(
@@ -722,7 +726,7 @@ class EvidenceNormalizer:
                     raw_value=obs,
                     display_value=f"Visual pattern detected: {label} ({sev})",
                     direction=EvidenceDirection.RISK_INCREASING if sev in ("moderate", "severe") else EvidenceDirection.UNKNOWN,
-                    details={"severity": sev},
+                    details={"severity": sev, **extra},
                 )
 
             evidence.image_observations.append(item)

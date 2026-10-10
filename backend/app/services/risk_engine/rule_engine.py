@@ -610,39 +610,90 @@ class RuleBasedRiskAnalysisEngine(BaseRiskAnalysisEngine):
     def _calculate_image_score(
         self, evidence: NormalizedEvidence
     ) -> Tuple[int, List[str], List[StructuredFactor]]:
-        """Calculate image score strictly adhering to CV safety rules."""
+        """Calculate image score strictly adhering to CV safety rules.
+
+        Safety & Integrity Rules:
+        - Image existence alone never increases risk score.
+        - Failed quality gates produce diagnostic notices, adding 0 pts.
+        - Duplicate photos of the same lesion are only scored once.
+        - If dermatological symptoms are already reported, erythema is treated as
+          corroborating visual evidence (+2 pts) rather than compound additive risk (+5 pts).
+        - Hard ceiling of 8 pts across all computer vision observations.
+        """
         score = 0
         factors: List[str] = []
         struct_factors: List[StructuredFactor] = []
 
+        # Check if patient already has active skin/dermatological symptoms reported
+        has_skin_symptom = any(
+            "skin" in str(sym.category).lower()
+            or "skin" in str(sym.name).lower()
+            or "red" in str(sym.name).lower()
+            or "itch" in str(sym.name).lower()
+            or "rash" in str(sym.name).lower()
+            for sym in evidence.symptoms
+        )
+
+        erythema_awarded = False
+        poor_quality_noted = False
+
         for img in evidence.image_observations:
             if img.id.endswith("_poor_quality"):
-                factors.append("Visual quality notice: attached photograph has insufficient lighting or resolution")
-                struct_factors.append(StructuredFactor(
-                    factor_name="Computer Vision Quality Gate",
-                    finding="Insufficient resolution/lighting",
-                    source=EvidenceSource.IMAGE_CV.value,
-                    status=EvidenceStatus.UNKNOWN.value,
-                    direction=EvidenceDirection.UNKNOWN.value,
-                    rule_applied="Image quality gate failed (0 pts added, diagnostic notice issued)",
-                    rationale="Poor photographic quality cannot confirm or rule out visual lesions.",
-                    contribution_pts=0,
-                ))
+                if not poor_quality_noted:
+                    poor_quality_noted = True
+                    factors.append("Visual quality notice: attached photograph has insufficient lighting, focus, or resolution")
+                    struct_factors.append(StructuredFactor(
+                        factor_name="Computer Vision Quality Gate",
+                        finding="Insufficient resolution, lighting, or focus",
+                        source=EvidenceSource.IMAGE_CV.value,
+                        status=EvidenceStatus.UNKNOWN.value,
+                        direction=EvidenceDirection.UNKNOWN.value,
+                        rule_applied="Image quality gate failed (0 pts added, uncertainty advisory issued)",
+                        rationale="Sub-optimal photographic quality cannot confirm or exclude visual lesions.",
+                        contribution_pts=0,
+                    ))
             elif img.id.endswith("_erythema"):
-                sev = img.details.get("severity") or "moderate"
-                inc = 5 if sev == "moderate" else 3
-                score += inc
-                factors.append("Computer vision observation: elevated localized erythema/redness observed")
-                struct_factors.append(StructuredFactor(
-                    factor_name="Visual Dermatological Inspection",
-                    finding=img.display_value,
-                    source=EvidenceSource.IMAGE_CV.value,
-                    status=EvidenceStatus.PRESENT.value,
-                    direction=EvidenceDirection.RISK_INCREASING.value,
-                    rule_applied=f"Erythema color ratio detection (+{inc} pts)",
-                    rationale="Objective superficial capillary engorgement consistent with local inflammation.",
-                    contribution_pts=inc,
-                ))
+                if not erythema_awarded:
+                    erythema_awarded = True
+                    sev = img.details.get("severity") or "moderate"
+
+                    # Prevent duplicate attribution: if skin symptoms were already reported,
+                    # treat image finding as corroborating rather than compound additive risk
+                    if has_skin_symptom:
+                        inc = 2  # Corroborating modifier
+                        rule_desc = "Corroborating visual erythema (+2 pts, modulated to prevent double-counting with reported dermatological symptoms)"
+                        rat_desc = "Objective visual erythema corroborates reported skin complaints without inflating total risk score through duplicate attribution."
+                        factor_desc = "Corroborating visual observation: elevated localized erythema confirmed"
+                    else:
+                        inc = 5 if sev == "moderate" else 3
+                        rule_desc = f"Independent visual erythema detection (+{inc} pts)"
+                        rat_desc = "Objective superficial capillary engorgement consistent with localized irritation or inflammation."
+                        factor_desc = "Computer vision observation: elevated localized erythema/redness observed"
+
+                    score += inc
+                    factors.append(factor_desc)
+                    struct_factors.append(StructuredFactor(
+                        factor_name="Visual Dermatological Inspection",
+                        finding=img.display_value,
+                        source=EvidenceSource.IMAGE_CV.value,
+                        status=EvidenceStatus.PRESENT.value,
+                        direction=EvidenceDirection.RISK_INCREASING.value,
+                        rule_applied=rule_desc,
+                        rationale=rat_desc,
+                        contribution_pts=inc,
+                    ))
+                else:
+                    # Additional image corroboration (0 additional points to prevent duplicate counting)
+                    struct_factors.append(StructuredFactor(
+                        factor_name="Secondary Visual Inspection",
+                        finding=img.display_value,
+                        source=EvidenceSource.IMAGE_CV.value,
+                        status=EvidenceStatus.PRESENT.value,
+                        direction=EvidenceDirection.RISK_INCREASING.value,
+                        rule_applied="Additional photo corroboration (+0 pts to prevent duplicate scoring)",
+                        rationale="Visual redness observed in secondary photo corroborates primary image finding without duplicating risk points.",
+                        contribution_pts=0,
+                    ))
 
         return min(8, score), factors, struct_factors
 

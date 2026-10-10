@@ -1384,37 +1384,94 @@ export default function AssessmentWizardPage() {
                               Part: {img.body_part || 'General'}
                             </div>
 
-                            {/* CV Quality Gate Badge */}
+                            {/* CV Quality Gate Badge & Results */}
                             {cv ? (
                               <div style={{ marginTop: '0.5rem' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.25rem' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap', marginBottom: '0.35rem' }}>
                                   <span
                                     style={{
                                       fontSize: '0.7rem',
                                       fontWeight: 700,
-                                      padding: '0.15rem 0.4rem',
+                                      padding: '0.15rem 0.45rem',
                                       borderRadius: 'var(--radius-sm)',
                                       backgroundColor:
-                                        cv.quality_gate_passed !== false
+                                        cv.quality_gate === 'PASSED' || cv.quality_gate_passed === true
                                           ? 'rgba(16, 185, 129, 0.15)'
                                           : 'rgba(239, 68, 68, 0.15)',
                                       color:
-                                        cv.quality_gate_passed !== false
+                                        cv.quality_gate === 'PASSED' || cv.quality_gate_passed === true
                                           ? 'var(--color-success)'
                                           : 'var(--color-danger)',
                                     }}
                                   >
-                                    Quality Gate: {cv.quality_gate_passed !== false ? 'PASSED' : 'LOW QUALITY'}
+                                    Quality Gate: {cv.quality_gate === 'PASSED' || cv.quality_gate_passed === true ? 'PASSED' : 'REQUIRES BETTER PHOTO'}
                                   </span>
                                   {cv.quality_score != null && (
                                     <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
-                                      Score: {(cv.quality_score * 100).toFixed(0)}%
+                                      Quality Score: {(cv.quality_score * 100).toFixed(0)}%
                                     </span>
                                   )}
                                 </div>
-                                {cv.findings_summary && (
-                                  <div style={{ fontSize: '0.75rem', color: 'var(--color-text-main)' }}>
-                                    {cv.findings_summary}
+
+                                {/* Quality Failure Reasons & Actionable Guidance */}
+                                {(cv.quality_gate === 'REQUIRES_BETTER_IMAGE' || cv.reasons?.length > 0) && (
+                                  <div
+                                    style={{
+                                      padding: '0.6rem 0.75rem',
+                                      borderRadius: 'var(--radius-sm)',
+                                      backgroundColor: '#fffbeb',
+                                      border: '1px solid #fde68a',
+                                      fontSize: '0.75rem',
+                                      color: '#92400e',
+                                      marginBottom: '0.5rem',
+                                    }}
+                                  >
+                                    {cv.reasons && cv.reasons.length > 0 && (
+                                      <div style={{ marginBottom: '0.35rem' }}>
+                                        <strong>Quality Issues:</strong> {cv.reasons.join('; ')}
+                                      </div>
+                                    )}
+                                    {cv.actionable_guidance && cv.actionable_guidance.length > 0 && (
+                                      <div>
+                                        <strong>💡 Actionable Tips:</strong>
+                                        <ul style={{ margin: '0.2rem 0 0 1rem', padding: 0 }}>
+                                          {cv.actionable_guidance.map((tip, tIdx) => (
+                                            <li key={tIdx}>{tip}</li>
+                                          ))}
+                                        </ul>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+
+                                {/* Quality Metrics Tags */}
+                                {cv.quality_metrics && (
+                                  <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', marginBottom: '0.4rem', fontSize: '0.7rem' }}>
+                                    <span style={{ padding: '0.1rem 0.35rem', backgroundColor: '#f1f5f9', borderRadius: '3px', color: '#475569' }}>
+                                      {cv.quality_metrics.width}x{cv.quality_metrics.height}px
+                                    </span>
+                                    <span style={{ padding: '0.1rem 0.35rem', backgroundColor: cv.quality_metrics.is_well_lit ? '#ecfdf5' : '#fef2f2', borderRadius: '3px', color: cv.quality_metrics.is_well_lit ? '#065f46' : '#991b1b' }}>
+                                      Lighting: {cv.quality_metrics.is_well_lit ? 'Good' : 'Sub-optimal'}
+                                    </span>
+                                    <span style={{ padding: '0.1rem 0.35rem', backgroundColor: cv.quality_metrics.is_sharp !== false ? '#ecfdf5' : '#fef2f2', borderRadius: '3px', color: cv.quality_metrics.is_sharp !== false ? '#065f46' : '#991b1b' }}>
+                                      Focus: {cv.quality_metrics.is_sharp !== false ? 'Sharp' : 'Blurry'}
+                                    </span>
+                                  </div>
+                                )}
+
+                                {/* Observations list */}
+                                {cv.observations && cv.observations.length > 0 && (
+                                  <div style={{ fontSize: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.25rem', marginTop: '0.3rem' }}>
+                                    {cv.observations.map((obs, oIdx) => (
+                                      <div key={oIdx} style={{ color: 'var(--color-text-main)' }}>
+                                        <strong>{obs.observation_label?.replace(/_/g, ' ')}:</strong> {obs.description}
+                                        {obs.observation_label === 'ELEVATED_ERYTHEMA_DETECTED' && (
+                                          <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', fontStyle: 'italic', marginTop: '0.1rem' }}>
+                                            * Measured visual redness; early computational indicator, not a definitive veterinary diagnosis.
+                                          </div>
+                                        )}
+                                      </div>
+                                    ))}
                                   </div>
                                 )}
                               </div>

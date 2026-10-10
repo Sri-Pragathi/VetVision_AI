@@ -882,10 +882,10 @@ cd backend
 .\venv\Scripts\pytest -v --cov=app tests/
 ```
 
-**Test Suite Verification Results (Step 8A Complete):**
-- **140 / 141 tests passing** (1 skipped — text question test)
-- **92% Code Coverage** across 3,000+ statements
-- **0 regressions** — all previous tests from Steps 1, 2, 3, 4, 5, and 6 pass completely.
+**Test Suite Verification Results (Step 8B Complete):**
+- **153 / 154 tests passing** (1 skipped — text question test)
+- **92% Code Coverage** across 3,200+ statements
+- **0 regressions** — all previous tests from Steps 1–8A pass completely.
 
 ---
 
@@ -915,7 +915,29 @@ Step 8A strengthens the clinical intelligence foundation of VetVision AI without
 
 ---
 
-## 17. Implementation Roadmap
+## 17. Step 8B — Enhanced Computer Vision & Image Analysis Reliability
+
+### Overview
+
+Step 8B improves photographic evidence quality assessment, actionable guidance, and duplicate evidence handling:
+1. **Deterministic Computer Vision Quality Gate**:
+   - **Blur / Edge Sharpness**: Calculated via edge filtering energy (`FIND_EDGES`). Images with low edge variance and low peak edge transitions are flagged for excessive blur/camera instability.
+   - **Luminance / Brightness**: Evaluates mean grayscale illumination. Images below $35.0$ (severe underexposure) or above $240.0$ (overexposure/glare) are gated.
+   - **Contrast**: Evaluates standard deviation of grayscale pixels. Images below $12.0$ (flat/washed out) are gated.
+   - **Resolution & Aspect Ratio**: Enforces minimum dimensions ($150\times 150\text{ px}$) and maximum aspect ratio distortion ($[0.2, 5.0]$).
+2. **Actionable User Guidance**:
+   - Rather than opaque errors, owners receive targeted corrective actions: *"Ensure the room or pet is well lit..."*, *"Hold the camera steady or tap to focus..."*, *"Move closer to the area of concern..."*, *"Avoid harsh camera flash or direct glare..."*.
+3. **Objective Visual Features vs. Non-Diagnostic Guardrails**:
+   - Detects measurable color features (erythema chromatic ratio) and tags them with non-diagnostic labels (`"Localized Erythema Feature (Early Visual Marker, Not Disease Diagnosis)"`).
+4. **Duplicate Evidence Prevention**:
+   - Multiple photos of the same issue are not scored repeatedly (first photo contributes, duplicates assign $0\text{ pts}$ with explainability notes).
+   - If owner already reported a corresponding skin symptom, photographic erythema is treated as corroborating evidence (modulated $+2\text{ pts}$ instead of $+5\text{ pts}$).
+5. **Emergency Inviolability**:
+   - Reassuring photographs cannot downgrade an emergency triage condition.
+
+---
+
+## 18. Implementation Roadmap
 
 | Step | Description | Status |
 |---|---|---|
@@ -927,6 +949,8 @@ Step 8A strengthens the clinical intelligence foundation of VetVision AI without
 | **Step 6** | Veterinary Report & Explainable Health Summary — Versioning, 13 Sections, HTML Render | ✅ Complete |
 | **Step 7** | Frontend Integration & UI — Web-based Assessment Workflow & Report Viewer | ✅ Complete |
 | **Step 8A** | Intelligence & Explainability Upgrade — Evidence Normalization, Contradictions, Clamped Attribution | ✅ Complete |
+| **Step 8B** | Enhanced CV & Image Reliability — Quality Metrics, Guidance, Duplicate Prevention | ✅ Complete |
+
 
 
 

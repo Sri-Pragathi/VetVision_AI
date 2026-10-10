@@ -93,13 +93,17 @@ class ReportHtmlRenderer:
                     images_html += "<div class='card subcard'><p class='text-muted'>Image analysis: Analysis not completed.</p></div>"
                     continue
                 if status == "REQUIRES_BETTER_IMAGE":
-                    images_html += """
-                    <div class="card subcard">
+                    warn_msg = cls._esc(img.get("quality_warnings") or img.get("quality", {}).get("warning") or "Image quality insufficient for reliable visual analysis.")
+                    guidance = cls._esc(img.get("actionable_guidance") or "")
+                    guidance_p = f"<p style='margin-top: 4px; font-size: 12px; color: #78350f;'><strong>Actionable Tip:</strong> {guidance}</p>" if guidance else ""
+                    images_html += f"""
+                    <div class="card subcard" style="border-left: 4px solid #f59e0b; background: #fffbeb;">
                         <div class="flex-between">
                             <strong>Photographic Record</strong>
                             <span class="tag tag-warning">Quality Warning</span>
                         </div>
-                        <p class="text-danger" style="margin-top: 6px;">Image analysis: Image quality insufficient for reliable visual analysis.</p>
+                        <p style="margin-top: 6px; font-size: 13px; color: #b91c1c;">⚠️ {warn_msg}</p>
+                        {guidance_p}
                     </div>
                     """
                     continue

@@ -227,6 +227,18 @@ class ReportService:
                         "analysis_timestamp": None,
                     })
                 elif img.quality_gate != "PASSED" or img.analysis_status in ["REQUIRES_BETTER_IMAGE", "FAILED"]:
+                    poor_obs = next((o for o in img.observations if o.observation_label == "POOR_IMAGE_QUALITY"), None)
+                    extra = (poor_obs.extra_data or {}) if poor_obs else {}
+                    reasons = extra.get("reasons") or []
+                    reasons_detail = "; ".join(reasons) if reasons else None
+                    reasons_str = (
+                        f"Image quality insufficient for reliable visual analysis: {reasons_detail}."
+                        if reasons_detail
+                        else "Image quality insufficient for reliable visual analysis."
+                    )
+                    guidance = extra.get("actionable_guidance") or []
+                    guidance_str = " ".join(guidance) if guidance else None
+
                     image_analysis_list.append({
                         "image_id": img.id,
                         "status": "REQUIRES_BETTER_IMAGE",
@@ -234,14 +246,18 @@ class ReportService:
                         "quality": {
                             "quality_gate": img.quality_gate,
                             "check_passed": False,
-                            "warning": "Image quality insufficient for reliable visual analysis.",
+                            "warning": reasons_str,
+                            "reasons": reasons,
+                            "actionable_guidance": guidance,
+                            "quality_metrics": extra.get("quality_metrics", {}),
                         },
                         "quality_gate": img.quality_gate,
-                        "quality_warnings": "Image quality insufficient for reliable visual analysis.",
-                        "visual_observations": "Image analysis: Image quality insufficient for reliable visual analysis.",
+                        "quality_warnings": reasons_str,
+                        "actionable_guidance": guidance_str,
+                        "visual_observations": "Image analysis: " + reasons_str,
                         "detected_visual_features": [],
                         "color_features": [],
-                        "findings_summary": "Image analysis: Image quality insufficient for reliable visual analysis.",
+                        "findings_summary": "Image analysis: " + reasons_str,
                         "analysis_timestamp": img.updated_at.isoformat() if img.updated_at else None,
                     })
                 else:
@@ -252,11 +268,15 @@ class ReportService:
                             "severity": o.severity,
                             "region": o.region,
                             "description": o.description,
+                            "extra_data": o.extra_data,
                         }
                         for o in img.observations
                     ]
                     detected_feats = [o.observation_label for o in img.observations]
                     color_feats = [o.observation_label for o in img.observations if o.observation_type == "color_feature"]
+                    suitable_obs = next((o for o in img.observations if o.observation_label == "SUITABLE_FOR_ANALYSIS"), None)
+                    passed_metrics = (suitable_obs.extra_data.get("quality_metrics", {})) if (suitable_obs and suitable_obs.extra_data) else {}
+
                     image_analysis_list.append({
                         "image_id": img.id,
                         "status": "COMPLETED",
@@ -265,6 +285,7 @@ class ReportService:
                             "quality_gate": img.quality_gate,
                             "check_passed": True,
                             "warning": None,
+                            "quality_metrics": passed_metrics,
                         },
                         "quality_gate": img.quality_gate,
                         "quality_warnings": None,

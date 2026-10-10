@@ -235,6 +235,7 @@ class ImageAnalysisService:
         result["quality_score"] = output.quality_score
         result["quality_metrics"] = output.quality_metrics
         result["reasons"] = output.reasons
+        result["actionable_guidance"] = getattr(output, "actionable_guidance", [])
         result["recommendation"] = output.recommendation
         result["disclaimer"] = output.disclaimer
         result["engine_version"] = output.engine_version
