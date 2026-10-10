@@ -73,13 +73,16 @@ class AssessmentRiskAnalysis(db.Model):
 
     def to_dict(self) -> Dict[str, Any]:
         """Serialize risk analysis record to dictionary."""
+        breakdown = self.factor_breakdown or {}
         return {
             "id": self.id,
             "assessment_id": self.assessment_id,
             "risk_level": self.risk_level,
             "risk_score": self.risk_score,
             "key_factors": self.key_factors or [],
-            "factor_breakdown": self.factor_breakdown or {},
+            "factor_breakdown": breakdown,
+            "structured_factors": breakdown.get("structured_factors", []),
+            "data_quality_warnings": breakdown.get("data_quality_warnings", []),
             "recommendation": self.recommendation,
             "emergency": self.is_emergency,
             "is_emergency": self.is_emergency,

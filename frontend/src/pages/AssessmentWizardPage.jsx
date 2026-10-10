@@ -1628,15 +1628,114 @@ export default function AssessmentWizardPage() {
                 </div>
               </div>
 
+              {/* Clinical Data Quality & Contradiction Notices */}
+              {((riskResult.data_quality_warnings && riskResult.data_quality_warnings.length > 0) ||
+                (riskResult.factor_breakdown?.data_quality_warnings && riskResult.factor_breakdown.data_quality_warnings.length > 0)) && (
+                <div
+                  style={{
+                    marginBottom: '1.5rem',
+                    padding: '1rem 1.25rem',
+                    borderRadius: 'var(--radius-md)',
+                    backgroundColor: '#fffbeb',
+                    border: '1px solid #fde68a',
+                  }}
+                >
+                  <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#92400e', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <span>⚠️</span> Clinical Evidence Uncertainty & Quality Notices
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                    {(riskResult.data_quality_warnings || riskResult.factor_breakdown.data_quality_warnings).map((w, wIdx) => (
+                      <div key={wIdx} style={{ fontSize: '0.825rem', color: '#78350f', lineHeight: 1.4 }}>
+                        <strong>{w.title}:</strong> {w.message}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Contributing Factors & Explainability */}
               <div style={{ marginBottom: '1.75rem' }}>
                 <h3 style={{ fontSize: '1.05rem', fontWeight: 700, marginBottom: '0.75rem' }}>
-                  Explainable Contributing Factors
+                  Explainable Factor Attribution & Evidence Sources
                 </h3>
 
-                {riskResult.contributing_factors && riskResult.contributing_factors.length > 0 ? (
+                {(riskResult.structured_factors && riskResult.structured_factors.length > 0) ||
+                (riskResult.factor_breakdown?.structured_factors && riskResult.factor_breakdown.structured_factors.length > 0) ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                    {(riskResult.structured_factors || riskResult.factor_breakdown.structured_factors).map((sf, sIdx) => {
+                      const isEmergency = sf.direction === 'emergency_override' || sf.is_emergency_flag;
+                      const isReassuring = sf.direction === 'reassuring';
+                      const isUnknown = sf.direction === 'unknown' || sf.status === 'UNKNOWN';
+
+                      return (
+                        <div
+                          key={sIdx}
+                          style={{
+                            padding: '0.85rem 1.15rem',
+                            borderRadius: 'var(--radius-md)',
+                            backgroundColor: isEmergency ? 'rgba(239, 68, 68, 0.05)' : isReassuring ? 'rgba(16, 185, 129, 0.05)' : 'var(--color-surface)',
+                            border: `1px solid ${isEmergency ? 'rgba(239, 68, 68, 0.25)' : isReassuring ? 'rgba(16, 185, 129, 0.25)' : 'var(--color-border)'}`,
+                            fontSize: '0.875rem',
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem', marginBottom: '0.35rem' }}>
+                            <div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                                <span style={{ fontWeight: 700, color: 'var(--color-text-main)' }}>{sf.factor_name}</span>
+                                <span
+                                  style={{
+                                    fontSize: '0.7rem',
+                                    fontWeight: 700,
+                                    textTransform: 'uppercase',
+                                    padding: '0.15rem 0.45rem',
+                                    borderRadius: 'var(--radius-sm)',
+                                    backgroundColor: 'rgba(2, 132, 199, 0.12)',
+                                    color: 'var(--color-primary)',
+                                  }}
+                                >
+                                  {sf.source?.replace('_', ' ') || 'CLINICAL'}
+                                </span>
+                                <span
+                                  style={{
+                                    fontSize: '0.7rem',
+                                    fontWeight: 700,
+                                    padding: '0.15rem 0.45rem',
+                                    borderRadius: 'var(--radius-sm)',
+                                    backgroundColor: isEmergency ? 'rgba(239, 68, 68, 0.15)' : isReassuring ? 'rgba(16, 185, 129, 0.15)' : isUnknown ? 'rgba(148, 163, 184, 0.2)' : 'rgba(234, 88, 12, 0.15)',
+                                    color: isEmergency ? 'var(--color-danger)' : isReassuring ? 'var(--color-success)' : isUnknown ? '#64748b' : 'var(--color-warning)',
+                                  }}
+                                >
+                                  {isEmergency ? 'EMERGENCY OVERRIDE' : isReassuring ? 'REASSURING' : isUnknown ? 'UNKNOWN STATUS' : 'RISK INCREASING'}
+                                </span>
+                              </div>
+                              <div style={{ color: 'var(--color-text-muted)', fontSize: '0.85rem', marginTop: '0.2rem' }}>
+                                Finding: <strong>{sf.finding}</strong>
+                              </div>
+                            </div>
+
+                            {sf.contribution_pts !== null && sf.contribution_pts !== undefined ? (
+                              <span style={{ fontWeight: 800, fontSize: '0.85rem', color: 'var(--color-primary)', whiteSpace: 'nowrap' }}>
+                                +{sf.contribution_pts} pts
+                              </span>
+                            ) : isEmergency ? (
+                              <span style={{ fontWeight: 800, fontSize: '0.75rem', color: 'var(--color-danger)', whiteSpace: 'nowrap' }}>
+                                {"FLOOR >= 90"}
+                              </span>
+                            ) : null}
+                          </div>
+
+                          {sf.rationale && (
+                            <div style={{ fontSize: '0.8rem', color: 'var(--color-text-main)', marginTop: '0.35rem', lineHeight: 1.4 }}>
+                              💡 <em>{sf.rationale}</em>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (riskResult.key_factors || riskResult.contributing_factors) && (riskResult.key_factors || riskResult.contributing_factors).length > 0 ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    {riskResult.contributing_factors.map((factor, idx) => (
+                    {(riskResult.key_factors || riskResult.contributing_factors).map((factor, idx) => (
                       <div
                         key={idx}
                         style={{

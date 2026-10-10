@@ -280,19 +280,21 @@ class ReportService:
                     })
 
         # Risk Analysis Section
+        breakdown = risk_analysis.factor_breakdown or {}
         risk_data = {
             "risk_level": risk_analysis.risk_level,
             "risk_score": risk_analysis.risk_score,
             "is_emergency": risk_analysis.is_emergency,
             "key_factors": risk_analysis.key_factors or [],
-            "factor_breakdown": risk_analysis.factor_breakdown or {},
+            "factor_breakdown": breakdown,
+            "structured_factors": breakdown.get("structured_factors", []),
+            "data_quality_warnings": breakdown.get("data_quality_warnings", []),
             "recommendation": risk_analysis.recommendation,
             "engine_version": risk_analysis.engine_version,
         }
 
         # Explainability Section
         explainability_data = []
-        breakdown = risk_analysis.factor_breakdown or {}
         if "symptom_score" in breakdown:
             sym_names = ", ".join([s["name"] for s in symptoms_data[:3]])
             explainability_data.append({

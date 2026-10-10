@@ -882,14 +882,40 @@ cd backend
 .\venv\Scripts\pytest -v --cov=app tests/
 ```
 
-**Test Suite Verification Results (Step 6 Complete):**
-- **130 / 131 tests passing** (1 skipped — text question test)
-- **92% Code Coverage** across 2,804 statements
-- **0 regressions** — all previous tests from Steps 1, 2, 3, 4, and 5 pass completely.
+**Test Suite Verification Results (Step 8A Complete):**
+- **140 / 141 tests passing** (1 skipped — text question test)
+- **92% Code Coverage** across 3,000+ statements
+- **0 regressions** — all previous tests from Steps 1, 2, 3, 4, 5, and 6 pass completely.
 
 ---
 
-## 16. Implementation Roadmap
+## 16. Step 8A — Evidence Normalization, Risk-Scoring Reliability & Explainability
+
+### Overview
+
+Step 8A strengthens the clinical intelligence foundation of VetVision AI without inventing artificial machine-learning claims or altering the safety envelope. It introduces:
+1. **Typed Evidence Representation**:
+   - `NormalizedEvidence`, `EvidenceItem`, `EvidenceSource` (`symptom`, `observation`, `follow_up`, `image`, `pet_profile`).
+   - `EvidenceStatus`: `PRESENT`, `ABSENT`, `UNKNOWN`, `CONTRADICTORY`.
+   - **Missing Data Safety**: Fields that are unobserved, questions left unanswered, and photos not uploaded or not analyzed are strictly classified as `UNKNOWN` and added to `unknown_evidence_fields`. They are never treated as negative or reassuring evidence.
+2. **Robust Type Handling**:
+   - Explicit boolean, string, and null conversion for observations (specifically `pain_observed`, which safely maps `"true"`, `True`, `"none"`, `"severe"`).
+3. **Data Quality & Contradiction Checker (`QualityChecker`)**:
+   - Flags conflicting respiratory signs (e.g., normal breathing observed despite severe respiratory symptom).
+   - Flags conflicting activity levels (e.g., normal activity recorded alongside severe lethargy/collapse).
+   - Chronological anomaly detection (e.g., reported symptom duration exceeding the pet's calculated age).
+   - Image quality gating: flags poor-quality or unanalyzed photos as data quality warnings without treating unanalyzed images as normal.
+4. **Structured Factor Explainability (`StructuredFactor`)**:
+   - Replaces vague explanation lists with structured attribution objects: `name`, `finding`, `source`, `status`, `direction` (`risk-increasing`, `reassuring`, `unknown`, `emergency override`), `rule_applied`, `rationale`, and `contribution_pts`.
+5. **Score Clamping & Emergency Hard-Stop Inviolability**:
+   - Sub-score contributions are mathematically bounded; the final score is strictly clamped to $[0, 100]$.
+   - Authoritative emergency hard-stop enforces a 90-point floor and emergency triage status whenever acute clinical flags are active.
+6. **Report Immutability**:
+   - Structured factors and data quality warnings are stored directly within the existing `factor_breakdown` JSON column without requiring destructive schema migrations.
+
+---
+
+## 17. Implementation Roadmap
 
 | Step | Description | Status |
 |---|---|---|
@@ -899,6 +925,8 @@ cd backend
 | **Step 4** | AI Health Risk Analysis Engine — Explainable Scoring, Emergency Hard-Stop, ML Adapter | ✅ Complete |
 | **Step 5** | Image Analysis Pipeline — Computer Vision Quality Gate, Observations & ML Adapter | ✅ Complete |
 | **Step 6** | Veterinary Report & Explainable Health Summary — Versioning, 13 Sections, HTML Render | ✅ Complete |
-| **Step 7** | Frontend Integration & UI — Web-based Assessment Workflow & Report Viewer | 🔜 Next |
+| **Step 7** | Frontend Integration & UI — Web-based Assessment Workflow & Report Viewer | ✅ Complete |
+| **Step 8A** | Intelligence & Explainability Upgrade — Evidence Normalization, Contradictions, Clamped Attribution | ✅ Complete |
+
 
 

@@ -2,30 +2,50 @@
 
 Provides transparent clinical heuristic scoring based on pet baseline,
 symptoms, duration, observations, follow-up answers, and emergency indicators.
+Upgraded in Step 8A with:
+- Typed evidence normalization (EvidenceNormalizer)
+- Contradiction & data-quality audit (QualityChecker)
+- Structured factor attribution with source, status, direction, and rule rationale
+- Type-safe handling for booleans, strings, nulls, and unexpected types
+- Strict emergency hard-stop preservation (score floor >= 90)
 """
-from typing import Dict, Any, List, Tuple
+from typing import Dict, Any, List, Tuple, Optional
 from app.services.risk_engine.base import BaseRiskAnalysisEngine, RiskAnalysisOutput
+from app.services.risk_engine.evidence import (
+    EvidenceNormalizer,
+    NormalizedEvidence,
+    EvidenceSource,
+    EvidenceStatus,
+    EvidenceDirection,
+)
+from app.services.risk_engine.quality_checker import QualityChecker, DataQualityWarning
+from app.services.risk_engine.structured_factor import StructuredFactor
 from app.services.emergency_service import EmergencyAssessmentService
 
 
 class RuleBasedRiskAnalysisEngine(BaseRiskAnalysisEngine):
     """Clinical heuristic scoring engine with transparent explainability.
 
-    This engine calculates a normalized 0–100 risk score and categorizes it into:
-    - LOW (0–29)
-    - MODERATE (30–59)
-    - HIGH (60–84)
-    - EMERGENCY (85–100 or hard-stop trigger)
+    Scoring Tiers:
+    - LOW: 0–29
+    - MODERATE: 30–59
+    - HIGH: 60–84
+    - EMERGENCY: 85–100 (or acute emergency hard-stop trigger with floor 90)
 
-    Emergency Hard-Stop Rule:
-    Any acute critical indicator (e.g., severe dyspnea, seizure, severe pain,
-    emergency follow-up response) immediately forces the risk level to EMERGENCY
-    and enforces a floor score of 90, regardless of other low score components.
+    Theoretical Sub-Score Maximums:
+    - Symptom severity: 55 pts
+    - Duration chronicity: 18 pts
+    - Physical observations: 30 pts
+    - Follow-up dynamic answers: 25 pts
+    - Vulnerability modifier: 15 pts
+    - Image observations: 8 pts
+    Sum = 151 pts, clamped strictly to [0, 100].
     """
 
     ENGINE_VERSION = "v1.0.0-rule_hybrid"
+    RULESET_VERSION = "v1.1.0-evidence_explainability"
 
-    # Base symptom severity points
+    # Base symptom severity weights
     SEVERITY_WEIGHTS = {
         "mild": 12,
         "moderate": 28,
@@ -38,56 +58,65 @@ class RuleBasedRiskAnalysisEngine(BaseRiskAnalysisEngine):
 
     def analyze(self, payload: Dict[str, Any]) -> RiskAnalysisOutput:
         """Run explainable risk analysis on structured AI payload."""
-        pet = payload.get("pet") or {}
-        symptoms = payload.get("symptoms") or []
-        observations = payload.get("observations") or {}
-        answers = payload.get("follow_up_answers") or []
+        # 1. Normalize Evidence into Typed Representation
+        evidence: NormalizedEvidence = EvidenceNormalizer.normalize(payload)
 
-        key_factors: List[str] = []
-        factor_breakdown: Dict[str, Any] = {}
+        # 2. Run Data Quality and Contradiction Audits
+        quality_warnings: List[DataQualityWarning] = QualityChecker.check(evidence)
+        warning_dicts = [w.to_dict() for w in quality_warnings]
 
-        # 1. Emergency Screening Baseline (Step 2 & 3 integration)
+        # 3. Emergency Screening Authority (Steps 2 & 3 Integration)
         emergency_eval = EmergencyAssessmentService.evaluate_payload(payload)
         is_emergency = emergency_eval.get("is_emergency_flagged", False)
         emergency_flags = emergency_eval.get("flags", [])
 
-        # 2. Symptom Severity Component (Max 55 pts)
-        symptom_score, symptom_factors = self._calculate_symptom_score(symptoms)
-        key_factors.extend(symptom_factors)
-        factor_breakdown["symptom_score"] = symptom_score
+        key_factors: List[str] = []
+        structured_factors: List[StructuredFactor] = []
+        factor_breakdown: Dict[str, Any] = {}
 
-        # 3. Symptom Duration Component (Max 18 pts)
-        duration_score, duration_factors = self._calculate_duration_score(symptoms)
-        key_factors.extend(duration_factors)
-        factor_breakdown["duration_score"] = duration_score
+        # 4. Calculate Sub-Scores and Structured Factor Attribution
+        # 4a. Symptom Score (Max 55 pts)
+        sym_score, sym_factors, struct_sym_factors = self._calculate_symptom_score(evidence)
+        key_factors.extend(sym_factors)
+        structured_factors.extend(struct_sym_factors)
+        factor_breakdown["symptom_score"] = sym_score
 
-        # 4. Physiological & Behavioral Observations (Max 30 pts)
-        obs_score, obs_factors = self._calculate_observation_score(observations)
+        # 4b. Duration Score (Max 18 pts)
+        dur_score, dur_factors, struct_dur_factors = self._calculate_duration_score(evidence)
+        key_factors.extend(dur_factors)
+        structured_factors.extend(struct_dur_factors)
+        factor_breakdown["duration_score"] = dur_score
+
+        # 4c. Physical Observations Score (Max 30 pts)
+        obs_score, obs_factors, struct_obs_factors = self._calculate_observation_score(evidence)
         key_factors.extend(obs_factors)
+        structured_factors.extend(struct_obs_factors)
         factor_breakdown["observation_score"] = obs_score
 
-        # 5. Dynamic Follow-Up Answers Component (Max 25 pts)
-        answers_score, answer_factors = self._calculate_answers_score(answers)
-        key_factors.extend(answer_factors)
-        factor_breakdown["follow_up_score"] = answers_score
+        # 4d. Dynamic Follow-Up Answers Score (Max 25 pts)
+        ans_score, ans_factors, struct_ans_factors = self._calculate_answers_score(evidence)
+        key_factors.extend(ans_factors)
+        structured_factors.extend(struct_ans_factors)
+        factor_breakdown["follow_up_score"] = ans_score
 
-        # 6. Pet Vulnerability Modifiers (Age, Species, Chronic Conditions) (Max 15 pts)
-        vuln_score, vuln_factors = self._calculate_vulnerability_score(pet)
+        # 4e. Patient Vulnerability Modifier (Max 15 pts)
+        vuln_score, vuln_factors, struct_vuln_factors = self._calculate_vulnerability_score(evidence)
         key_factors.extend(vuln_factors)
+        structured_factors.extend(struct_vuln_factors)
         factor_breakdown["vulnerability_modifier"] = vuln_score
 
-        # 7. Computer Vision Visual Observations Component (Max 8 pts)
-        img_analysis = payload.get("image_analysis") or {}
-        img_score, img_factors = self._calculate_image_score(img_analysis)
+        # 4f. Computer Vision Image Observations (Max 8 pts)
+        img_score, img_factors, struct_img_factors = self._calculate_image_score(evidence)
         key_factors.extend(img_factors)
+        structured_factors.extend(struct_img_factors)
         factor_breakdown["image_score"] = img_score
 
-        # 8. Aggregate Raw Score (Base Sum)
-        raw_score = symptom_score + duration_score + obs_score + answers_score + vuln_score + img_score
+        # 5. Raw Score Summation & Clamping [0, 100]
+        raw_score = sym_score + dur_score + obs_score + ans_score + vuln_score + img_score
         calculated_score = min(100, max(0, raw_score))
         factor_breakdown["raw_calculated_score"] = calculated_score
 
-        # 9. Apply Emergency Hard-Stop Rule
+        # 6. Apply Emergency Hard-Stop Rule
         factor_breakdown["emergency_override"] = False
 
         if is_emergency or emergency_flags:
@@ -95,10 +124,23 @@ class RuleBasedRiskAnalysisEngine(BaseRiskAnalysisEngine):
             risk_level = "EMERGENCY"
             risk_score = max(calculated_score, 90)
             factor_breakdown["emergency_override"] = True
-            # Place emergency flags prominently at the front of key factors
+
             emergency_descriptions = [f"CRITICAL: {flag}" for flag in emergency_flags]
-            # Avoid duplicate factor notes
             key_factors = emergency_descriptions + [f for f in key_factors if f not in emergency_descriptions]
+
+            # Prepend emergency structured factors
+            for flag in emergency_flags:
+                structured_factors.insert(0, StructuredFactor(
+                    factor_name="Emergency Hard-Stop Trigger",
+                    finding=flag,
+                    source=EvidenceSource.SAFETY_OVERRIDE.value,
+                    status=EvidenceStatus.PRESENT.value,
+                    direction=EvidenceDirection.EMERGENCY_OVERRIDE.value,
+                    rule_applied="Clinical safety override enforces triage floor score >= 90",
+                    rationale="Critical signs bypass routine additive scoring to protect patient life safety.",
+                    contribution_pts=None,  # Not an additive contribution, but a safety floor
+                    is_emergency_flag=True,
+                ))
         else:
             risk_score = calculated_score
             if risk_score >= 85:
@@ -110,12 +152,12 @@ class RuleBasedRiskAnalysisEngine(BaseRiskAnalysisEngine):
             else:
                 risk_level = "LOW"
 
-        # 9. Formulate Clear Action-Oriented Recommendation
+        # 7. Generate Recommendation
         recommendation = self._generate_recommendation(risk_level, is_emergency)
 
-        # 10. Clean and Deduplicate Factors (Top 6 most clinically relevant)
+        # 8. Deduplicate Key Factors
         seen_factors = set()
-        deduped_factors = []
+        deduped_factors: List[str] = []
         for factor in key_factors:
             if factor and factor not in seen_factors:
                 seen_factors.add(factor)
@@ -124,226 +166,485 @@ class RuleBasedRiskAnalysisEngine(BaseRiskAnalysisEngine):
         if not deduped_factors:
             deduped_factors.append("Mild symptoms with stable physiological observations")
 
+        # 9. Store Metadata in factor_breakdown
+        factor_breakdown["ruleset_version"] = self.RULESET_VERSION
+        factor_breakdown["structured_factors"] = [f.to_dict() for f in structured_factors]
+        factor_breakdown["data_quality_warnings"] = warning_dicts
+        factor_breakdown["unknown_evidence_fields"] = evidence.unknown_fields
+        factor_breakdown["evidence_summary"] = {
+            "symptoms_reported": len(evidence.symptoms),
+            "observations_recorded": len([o for o in evidence.observations if o.status != EvidenceStatus.UNKNOWN]),
+            "unknown_fields_count": len(evidence.unknown_fields),
+            "contradiction_warnings_count": len([w for w in quality_warnings if w.category == "contradiction"]),
+        }
+
         return RiskAnalysisOutput(
             risk_level=risk_level,
             risk_score=risk_score,
             key_factors=deduped_factors[:6],
             factor_breakdown=factor_breakdown,
+            structured_factors=[f.to_dict() for f in structured_factors],
+            data_quality_warnings=warning_dicts,
             recommendation=recommendation,
             is_emergency=is_emergency,
             engine_version=self.ENGINE_VERSION,
         )
 
     def _calculate_symptom_score(
-        self, symptoms: List[Dict[str, Any]]
-    ) -> Tuple[int, List[str]]:
-        """Compute score contribution from reported symptoms."""
+        self, evidence: NormalizedEvidence
+    ) -> Tuple[int, List[str], List[StructuredFactor]]:
+        """Calculate score and structured factors from reported symptoms."""
+        symptoms = evidence.symptoms
         if not symptoms:
-            return 0, []
+            return 0, [], []
 
         factors: List[str] = []
-        weights: List[int] = []
+        struct_factors: List[StructuredFactor] = []
+        weights: List[Tuple[int, str, str]] = []
 
         for sym in symptoms:
-            sev = (sym.get("severity") or "mild").lower()
+            sev = (sym.details.get("severity") or "mild").lower()
             w = self.SEVERITY_WEIGHTS.get(sev, 12)
-            weights.append(w)
-            name = sym.get("name") or "Reported symptom"
-            if sev == "severe":
-                factors.append(f"Severe primary symptom: {name}")
-            elif sev == "moderate":
-                factors.append(f"Moderate symptom: {name}")
+            name = sym.name
+            weights.append((w, name, sev))
 
-        weights.sort(reverse=True)
-        primary_score = weights[0]
-        # Diminishing weight for additional symptoms
-        additional_score = sum(round(w * 0.4) for w in weights[1:])
-        total_symptom_score = min(55, primary_score + min(20, additional_score))
+        weights.sort(key=lambda x: x[0], reverse=True)
+        primary_w, primary_name, primary_sev = weights[0]
 
-        if len(symptoms) > 1:
-            factors.append(f"Multiple co-occurring symptoms ({len(symptoms)} symptoms reported)")
+        # Primary symptom factor
+        struct_factors.append(StructuredFactor(
+            factor_name="Primary Symptom Severity",
+            finding=f"{primary_name} ({primary_sev})",
+            source=EvidenceSource.SYMPTOM_INTAKE.value,
+            status=EvidenceStatus.PRESENT.value,
+            direction=EvidenceDirection.RISK_INCREASING.value,
+            rule_applied=f"Primary symptom assigned severity base weight of {primary_w} pts",
+            rationale=f"Primary complaint of {primary_name} defines the acute clinical presentation.",
+            contribution_pts=primary_w,
+        ))
 
-        return total_symptom_score, factors
+        if primary_sev == "severe":
+            factors.append(f"Severe primary symptom: {primary_name}")
+        elif primary_sev == "moderate":
+            factors.append(f"Moderate symptom: {primary_name}")
+
+        # Diminishing weight for additional co-occurring symptoms
+        additional_score = 0
+        if len(weights) > 1:
+            for w, name, sev in weights[1:]:
+                inc = round(w * 0.4)
+                additional_score += inc
+                struct_factors.append(StructuredFactor(
+                    factor_name="Co-Occurring Symptom",
+                    finding=f"{name} ({sev})",
+                    source=EvidenceSource.SYMPTOM_INTAKE.value,
+                    status=EvidenceStatus.PRESENT,
+                    direction=EvidenceDirection.RISK_INCREASING.value,
+                    rule_applied=f"Co-occurring symptom assigned diminishing weight (40% of {w} = +{inc} pts)",
+                    rationale=f"Multiple concurrent clinical signs indicate broader physiological impact.",
+                    contribution_pts=inc,
+                ))
+
+            additional_capped = min(20, additional_score)
+            factors.append(f"Multiple co-occurring symptoms ({len(weights)} symptoms reported)")
+
+        total_symptom_score = min(55, primary_w + min(20, additional_score))
+        return total_symptom_score, factors, struct_factors
 
     def _calculate_duration_score(
-        self, symptoms: List[Dict[str, Any]]
-    ) -> Tuple[int, List[str]]:
-        """Evaluate chronicity and progression risk from symptom duration."""
+        self, evidence: NormalizedEvidence
+    ) -> Tuple[int, List[str], List[StructuredFactor]]:
+        """Calculate score and structured factors from symptom duration."""
+        symptoms = evidence.symptoms
         if not symptoms:
-            return 0, []
+            return 0, [], []
 
         max_hours = 0.0
+        max_sym_name = ""
         for sym in symptoms:
-            dur_hours = sym.get("duration_hours")
-            if dur_hours is not None and dur_hours > max_hours:
-                max_hours = dur_hours
+            dur = sym.details.get("duration_hours")
+            if dur is not None and dur > max_hours:
+                max_hours = dur
+                max_sym_name = sym.name
 
         factors: List[str] = []
+        struct_factors: List[StructuredFactor] = []
         duration_score = 0
 
-        if max_hours >= 168.0:  # > 7 days
+        if max_hours >= 168.0:
             duration_score = 18
+            finding_text = f"Persistent chronic duration ({max_hours/24:.1f} days for {max_sym_name})"
             factors.append("Symptoms persisting chronically for more than 1 week")
-        elif max_hours >= 72.0:  # 3 to 7 days
+            struct_factors.append(StructuredFactor(
+                factor_name="Chronic Symptom Duration",
+                finding=finding_text,
+                source=EvidenceSource.SYMPTOM_INTAKE.value,
+                status=EvidenceStatus.PRESENT.value,
+                direction=EvidenceDirection.RISK_INCREASING.value,
+                rule_applied="Duration >= 168 hours (+18 pts)",
+                rationale="Chronic persistence (> 7 days) elevates risk of secondary systemic deterioration.",
+                contribution_pts=18,
+            ))
+        elif max_hours >= 72.0:
             duration_score = 12
+            finding_text = f"Multi-day duration ({max_hours/24:.1f} days for {max_sym_name})"
             factors.append("Symptoms persisting for several days (3–7 days)")
-        elif max_hours >= 24.0:  # 1 to 3 days
+            struct_factors.append(StructuredFactor(
+                factor_name="Prolonged Symptom Duration",
+                finding=finding_text,
+                source=EvidenceSource.SYMPTOM_INTAKE.value,
+                status=EvidenceStatus.PRESENT.value,
+                direction=EvidenceDirection.RISK_INCREASING.value,
+                rule_applied="Duration between 72 and 168 hours (+12 pts)",
+                rationale="Symptoms persisting 3 to 7 days warrant formal clinical evaluation.",
+                contribution_pts=12,
+            ))
+        elif max_hours >= 24.0:
             duration_score = 6
+            finding_text = f"Duration between 24 and 72 hours for {max_sym_name}"
             factors.append("Symptoms persisting between 24 and 72 hours")
-        elif max_hours > 0.0 and any((s.get("severity") or "").lower() in ("moderate", "severe") for s in symptoms):
+            struct_factors.append(StructuredFactor(
+                factor_name="Moderate Symptom Duration",
+                finding=finding_text,
+                source=EvidenceSource.SYMPTOM_INTAKE.value,
+                status=EvidenceStatus.PRESENT.value,
+                direction=EvidenceDirection.RISK_INCREASING.value,
+                rule_applied="Duration between 24 and 72 hours (+6 pts)",
+                rationale="Symptoms crossing 24 hours indicate failure of immediate spontaneous resolution.",
+                contribution_pts=6,
+            ))
+        elif max_hours > 0.0 and any(s.details.get("severity") in ("moderate", "severe") for s in symptoms):
             duration_score = 3
             factors.append("Acute symptom onset (< 24 hours)")
+            struct_factors.append(StructuredFactor(
+                factor_name="Acute Symptom Onset",
+                finding=f"Acute onset (< 24 hours) with moderate/severe signs",
+                source=EvidenceSource.SYMPTOM_INTAKE.value,
+                status=EvidenceStatus.PRESENT.value,
+                direction=EvidenceDirection.RISK_INCREASING.value,
+                rule_applied="Acute onset with moderate/severe severity (+3 pts)",
+                rationale="Rapid acute manifestation indicates active pathological progression.",
+                contribution_pts=3,
+            ))
 
-        return duration_score, factors
+        return duration_score, factors, struct_factors
 
     def _calculate_observation_score(
-        self, obs: Dict[str, Any]
-    ) -> Tuple[int, List[str]]:
-        """Score clinical observations for metabolic and physiological stability."""
+        self, evidence: NormalizedEvidence
+    ) -> Tuple[int, List[str], List[StructuredFactor]]:
+        """Calculate physical observation scores with type safety."""
         score = 0
         factors: List[str] = []
+        struct_factors: List[StructuredFactor] = []
 
-        # Appetite
-        appetite = (obs.get("appetite") or "").lower()
-        if appetite in ("none", "anorexia"):
-            score += 14
-            factors.append("Complete loss of appetite / anorexia")
-        elif appetite == "decreased":
-            score += 6
-            factors.append("Decreased food intake observed")
+        # Find observation items
+        obs_map = {o.id: o for o in evidence.observations}
 
-        # Water intake
-        water = (obs.get("water_intake") or "").lower()
-        if water in ("none", "refusing"):
-            score += 14
-            factors.append("Refusal to drink water (acute dehydration risk)")
-        elif water == "increased":
-            score += 6
-            factors.append("Polydipsia / significantly increased thirst")
+        # 1. Appetite
+        for oid, pts, label, rat in [
+            ("obs_appetite_absent", 14, "Complete loss of appetite / anorexia", "Complete anorexia causes rapid hepatic lipidosis risk (in cats) and hypoglycemia."),
+            ("obs_appetite_decreased", 6, "Decreased food intake observed", "Decreased caloric intake reflects metabolic discomfort or nausea."),
+        ]:
+            if oid in obs_map and obs_map[oid].status == EvidenceStatus.PRESENT:
+                score += pts
+                factors.append(label)
+                struct_factors.append(StructuredFactor(
+                    factor_name="Appetite Observation",
+                    finding=obs_map[oid].display_value,
+                    source=EvidenceSource.PHYSICAL_OBSERVATION.value,
+                    status=EvidenceStatus.PRESENT.value,
+                    direction=EvidenceDirection.RISK_INCREASING.value,
+                    rule_applied=f"{label} (+{pts} pts)",
+                    rationale=rat,
+                    contribution_pts=pts,
+                ))
 
-        # Activity level
-        activity = (obs.get("activity_level") or "").lower()
-        if activity in ("depressed", "collapse"):
-            score += 16
-            factors.append("Marked depression or collapse in activity")
-        elif activity == "lethargic":
-            score += 10
-            factors.append("Noticeable lethargy and sluggishness")
-        elif activity == "decreased":
-            score += 5
+        # 2. Water Intake
+        for oid, pts, label, rat in [
+            ("obs_water_refusing", 14, "Refusal to drink water (acute dehydration risk)", "Adipsia accelerates acute hypovolemia and dehydration."),
+            ("obs_water_increased", 6, "Polydipsia / significantly increased thirst", "Polydipsia can signal renal compromise, diabetes, or endocrine strain."),
+        ]:
+            if oid in obs_map and obs_map[oid].status == EvidenceStatus.PRESENT:
+                score += pts
+                factors.append(label)
+                struct_factors.append(StructuredFactor(
+                    factor_name="Hydration Observation",
+                    finding=obs_map[oid].display_value,
+                    source=EvidenceSource.PHYSICAL_OBSERVATION.value,
+                    status=EvidenceStatus.PRESENT.value,
+                    direction=EvidenceDirection.RISK_INCREASING.value,
+                    rule_applied=f"{label} (+{pts} pts)",
+                    rationale=rat,
+                    contribution_pts=pts,
+                ))
 
-        # Respiration
-        breathing = (obs.get("breathing_change") or "").lower()
-        if breathing in ("labored", "wheezing"):
+        # 3. Activity Level
+        for oid, pts, label, rat in [
+            ("obs_activity_collapse", 16, "Marked depression or collapse in activity", "Severe depression or collapse reflects central nervous system or circulatory compromise."),
+            ("obs_activity_lethargic", 10, "Noticeable lethargy and sluggishness", "Generalized lethargy signals systemic inflammatory or infectious burden."),
+        ]:
+            if oid in obs_map and obs_map[oid].status == EvidenceStatus.PRESENT:
+                score += pts
+                factors.append(label)
+                struct_factors.append(StructuredFactor(
+                    factor_name="Activity Observation",
+                    finding=obs_map[oid].display_value,
+                    source=EvidenceSource.PHYSICAL_OBSERVATION.value,
+                    status=EvidenceStatus.PRESENT.value,
+                    direction=EvidenceDirection.RISK_INCREASING.value,
+                    rule_applied=f"{label} (+{pts} pts)",
+                    rationale=rat,
+                    contribution_pts=pts,
+                ))
+
+        # 4. Respiration
+        if "obs_breathing_labored" in obs_map and obs_map["obs_breathing_labored"].status == EvidenceStatus.PRESENT:
             score += 25
             factors.append("Abnormal respiratory effort: labored breathing / wheezing")
-        elif breathing == "rapid":
+            struct_factors.append(StructuredFactor(
+                factor_name="Respiratory Effort",
+                finding=obs_map["obs_breathing_labored"].display_value,
+                source=EvidenceSource.PHYSICAL_OBSERVATION.value,
+                status=EvidenceStatus.PRESENT.value,
+                direction=EvidenceDirection.EMERGENCY_OVERRIDE.value,
+                rule_applied="Labored breathing (+25 pts & emergency hard-stop)",
+                rationale="Labored respiration creates immediate hypoxia risk requiring urgent stabilization.",
+                contribution_pts=25,
+                is_emergency_flag=True,
+            ))
+        elif "obs_breathing_rapid" in obs_map and obs_map["obs_breathing_rapid"].status == EvidenceStatus.PRESENT:
             score += 12
             factors.append("Tachypnea / abnormally rapid breathing")
+            struct_factors.append(StructuredFactor(
+                factor_name="Respiratory Effort",
+                finding=obs_map["obs_breathing_rapid"].display_value,
+                source=EvidenceSource.PHYSICAL_OBSERVATION.value,
+                status=EvidenceStatus.PRESENT.value,
+                direction=EvidenceDirection.RISK_INCREASING.value,
+                rule_applied="Rapid breathing tachypnea (+12 pts)",
+                rationale="Tachypnea may indicate pain, fever, or early respiratory compensation.",
+                contribution_pts=12,
+            ))
 
-        # Pain
-        pain = (obs.get("pain_observed") or "").lower()
-        if pain == "severe":
-            score += 22
-            factors.append("Severe signs of physical pain or distress")
-        elif pain == "moderate":
-            score += 12
-            factors.append("Moderate signs of pain or discomfort")
-        elif pain == "mild":
-            score += 5
+        # 5. Pain Observation (Handles boolean True, "severe", "moderate", "mild")
+        pain_item = next((o for o in evidence.observations if o.id.startswith("obs_pain_") and o.status == EvidenceStatus.PRESENT), None)
+        if pain_item:
+            sev = pain_item.details.get("pain_severity") or "moderate"
+            if sev == "severe" or pain_item.id == "obs_pain_severe":
+                score += 22
+                factors.append("Severe signs of physical pain or distress")
+                struct_factors.append(StructuredFactor(
+                    factor_name="Pain Observation",
+                    finding=pain_item.display_value,
+                    source=EvidenceSource.PHYSICAL_OBSERVATION.value,
+                    status=EvidenceStatus.PRESENT.value,
+                    direction=EvidenceDirection.EMERGENCY_OVERRIDE.value,
+                    rule_applied="Severe pain observation (+22 pts & urgent evaluation)",
+                    rationale="Severe acute pain requires immediate clinical analgesia and source diagnostic.",
+                    contribution_pts=22,
+                    is_emergency_flag=True,
+                ))
+            elif sev == "moderate" or pain_item.id in ("obs_pain_moderate", "obs_pain_boolean_true"):
+                score += 12
+                factors.append("Moderate signs of pain or discomfort")
+                struct_factors.append(StructuredFactor(
+                    factor_name="Pain Observation",
+                    finding=pain_item.display_value,
+                    source=EvidenceSource.PHYSICAL_OBSERVATION.value,
+                    status=EvidenceStatus.PRESENT.value,
+                    direction=EvidenceDirection.RISK_INCREASING.value,
+                    rule_applied="Moderate pain observed (+12 pts)",
+                    rationale="Observable discomfort indicates active musculoskeletal or visceral inflammation.",
+                    contribution_pts=12,
+                ))
+            elif sev == "mild" or pain_item.id == "obs_pain_mild":
+                score += 5
+                struct_factors.append(StructuredFactor(
+                    factor_name="Pain Observation",
+                    finding=pain_item.display_value,
+                    source=EvidenceSource.PHYSICAL_OBSERVATION.value,
+                    status=EvidenceStatus.PRESENT.value,
+                    direction=EvidenceDirection.RISK_INCREASING.value,
+                    rule_applied="Mild pain observed (+5 pts)",
+                    rationale="Mild discomfort noted during examination.",
+                    contribution_pts=5,
+                ))
 
-        # Elimination (Stool / Urine)
-        stool = (obs.get("stool_change") or "").lower()
-        urine = (obs.get("urine_change") or "").lower()
-        if any(term in stool for term in ("bloody", "black", "none", "watery")):
+        # 6. Elimination Patterns
+        if "obs_stool_change" in obs_map and obs_map["obs_stool_change"].status == EvidenceStatus.PRESENT:
             score += 8
-            factors.append(f"Abnormal stool changes noted: {stool}")
-        if any(term in urine for term in ("bloody", "none", "straining", "frequent")):
-            score += 10
-            factors.append(f"Abnormal urinary pattern noted: {urine}")
+            val = obs_map["obs_stool_change"].display_value
+            factors.append(f"Abnormal stool changes noted: {val}")
+            struct_factors.append(StructuredFactor(
+                factor_name="Gastrointestinal Elimination",
+                finding=val,
+                source=EvidenceSource.PHYSICAL_OBSERVATION.value,
+                status=EvidenceStatus.PRESENT.value,
+                direction=EvidenceDirection.RISK_INCREASING.value,
+                rule_applied="Abnormal stool pattern (+8 pts)",
+                rationale="Altered stool indicates enteric irritation or malabsorption.",
+                contribution_pts=8,
+            ))
 
-        return min(30, score), factors
+        if "obs_urine_change" in obs_map and obs_map["obs_urine_change"].status == EvidenceStatus.PRESENT:
+            score += 10
+            val = obs_map["obs_urine_change"].display_value
+            factors.append(f"Abnormal urinary pattern noted: {val}")
+            struct_factors.append(StructuredFactor(
+                factor_name="Urinary Pattern",
+                finding=val,
+                source=EvidenceSource.PHYSICAL_OBSERVATION.value,
+                status=EvidenceStatus.PRESENT.value,
+                direction=EvidenceDirection.RISK_INCREASING.value,
+                rule_applied="Abnormal urinary pattern (+10 pts)",
+                rationale="Altered urination can signal lower urinary tract infection or obstruction.",
+                contribution_pts=10,
+            ))
+
+        # Add Reassuring Physical Factors if Present
+        if "obs_breathing_normal" in obs_map and obs_map["obs_breathing_normal"].status == EvidenceStatus.ABSENT:
+            struct_factors.append(StructuredFactor(
+                factor_name="Respiratory Effort",
+                finding="Normal, effortless breathing",
+                source=EvidenceSource.PHYSICAL_OBSERVATION.value,
+                status=EvidenceStatus.ABSENT.value,
+                direction=EvidenceDirection.REASSURING.value,
+                rule_applied="Eupneic respiration baseline",
+                rationale="Effortless breathing indicates absence of acute airway obstruction.",
+                contribution_pts=0,
+            ))
+
+        return min(30, score), factors, struct_factors
 
     def _calculate_answers_score(
-        self, answers: List[Dict[str, Any]]
-    ) -> Tuple[int, List[str]]:
-        """Score responses from dynamic follow-up questions."""
+        self, evidence: NormalizedEvidence
+    ) -> Tuple[int, List[str], List[StructuredFactor]]:
+        """Calculate dynamic follow-up answers score."""
         score = 0
         factors: List[str] = []
+        struct_factors: List[StructuredFactor] = []
 
-        for ans in answers:
-            # Check weight
-            weight = ans.get("severity_weight")
+        for ans in evidence.follow_up_answers:
+            pts_for_ans = 0
+            weight = ans.details.get("severity_weight")
             if weight is not None and isinstance(weight, (int, float)):
-                score += round(weight * 12)
+                pts_for_ans += round(weight * 12)
 
-            # Check textual hints of worsening or severity
-            opt_val = (ans.get("answer_option_value") or "").lower()
-            opt_text = (ans.get("answer_option") or "").lower()
-            ans_text = (ans.get("answer_text") or "").lower()
-            combined_text = f"{opt_val} {opt_text} {ans_text}"
-
-            if any(term in combined_text for term in ("worsen", "worse", "increasing", "severe")):
-                score += 5
+            is_worsening = ans.details.get("is_worsening", False)
+            if is_worsening:
+                pts_for_ans += 5
                 factors.append("Follow-up response indicates worsening clinical condition")
-            elif any(term in combined_text for term in ("frequent", "persistent")):
-                score += 3
-                factors.append("Follow-up response confirms frequent or persistent recurrence")
 
-        return min(25, score), factors
+            if pts_for_ans > 0:
+                score += pts_for_ans
+                struct_factors.append(StructuredFactor(
+                    factor_name="Follow-Up Clinical Inquiry",
+                    finding=ans.display_value,
+                    source=EvidenceSource.ADAPTIVE_INQUIRY.value,
+                    status=EvidenceStatus.PRESENT.value,
+                    direction=EvidenceDirection.RISK_INCREASING.value,
+                    rule_applied=f"Dynamic follow-up answer weight (+{pts_for_ans} pts)",
+                    rationale="Owner response during adaptive inquiry confirmed heightened clinical severity.",
+                    contribution_pts=pts_for_ans,
+                    is_emergency_flag=ans.is_emergency_flag,
+                ))
+
+        return min(25, score), factors, struct_factors
 
     def _calculate_vulnerability_score(
-        self, pet: Dict[str, Any]
-    ) -> Tuple[int, List[str]]:
-        """Score physiological vulnerability based on age, species, and medical baseline."""
+        self, evidence: NormalizedEvidence
+    ) -> Tuple[int, List[str], List[StructuredFactor]]:
+        """Calculate patient baseline vulnerability score."""
         score = 0
         factors: List[str] = []
+        struct_factors: List[StructuredFactor] = []
 
-        is_juvenile = pet.get("is_juvenile")
-        is_senior = pet.get("is_senior")
-        conditions = pet.get("existing_conditions")
+        pet = evidence.patient
+        is_juv = pet.get("is_juvenile")
+        is_sen = pet.get("is_senior")
+        cond = pet.get("existing_conditions")
 
-        if is_juvenile:
+        if is_juv:
             score += 8
             factors.append("Age vulnerability: young pet (< 12 months) has elevated risk of rapid clinical decline")
-        elif is_senior:
+            struct_factors.append(StructuredFactor(
+                factor_name="Patient Age Vulnerability",
+                finding="Young pet (< 12 months)",
+                source=EvidenceSource.PATIENT_BASELINE.value,
+                status=EvidenceStatus.PRESENT.value,
+                direction=EvidenceDirection.RISK_INCREASING.value,
+                rule_applied="Juvenile life-stage modifier (+8 pts)",
+                rationale="Puppies and kittens have low physiological reserve and deteriorate quickly under illness.",
+                contribution_pts=8,
+            ))
+        elif is_sen:
             score += 8
             factors.append("Age vulnerability: senior pet with increased susceptibility to complications")
+            struct_factors.append(StructuredFactor(
+                factor_name="Patient Age Vulnerability",
+                finding="Senior pet",
+                source=EvidenceSource.PATIENT_BASELINE.value,
+                status=EvidenceStatus.PRESENT.value,
+                direction=EvidenceDirection.RISK_INCREASING.value,
+                rule_applied="Senior life-stage modifier (+8 pts)",
+                rationale="Senior pets have higher incidence of co-morbidities and delayed recovery.",
+                contribution_pts=8,
+            ))
 
-        if conditions:
+        if cond and str(cond).strip() and str(cond).strip().lower() not in ("none", "none reported", "n/a"):
             score += 6
-            factors.append(f"Pre-existing health conditions in profile: {conditions[:60]}")
+            factors.append(f"Pre-existing health conditions in profile: {str(cond)[:60]}")
+            struct_factors.append(StructuredFactor(
+                factor_name="Pre-Existing Chronic Conditions",
+                finding=str(cond).strip()[:80],
+                source=EvidenceSource.PATIENT_BASELINE.value,
+                status=EvidenceStatus.PRESENT.value,
+                direction=EvidenceDirection.RISK_INCREASING.value,
+                rule_applied="Chronic medical condition modifier (+6 pts)",
+                rationale="Pre-existing illness predisposes patient to acute disease exacerbation.",
+                contribution_pts=6,
+            ))
 
-        return min(15, score), factors
+        return min(15, score), factors, struct_factors
 
     def _calculate_image_score(
-        self, img_analysis: Dict[str, Any]
-    ) -> Tuple[int, List[str]]:
-        """Score structured observations extracted from computer vision image analysis.
-
-        Crucial Safety Constraints:
-        - Image existence alone never increases risk score.
-        - Low quality images produce an informational notice, not disease conclusions.
-        - Supported visual features (e.g. erythema) provide modest correlated signal (max 8 pts).
-        """
+        self, evidence: NormalizedEvidence
+    ) -> Tuple[int, List[str], List[StructuredFactor]]:
+        """Calculate image score strictly adhering to CV safety rules."""
         score = 0
         factors: List[str] = []
+        struct_factors: List[StructuredFactor] = []
 
-        observations = img_analysis.get("observations") or []
-        for obs in observations:
-            label = obs.get("observation_label", "")
-            severity = (obs.get("severity") or "normal").lower()
-
-            if label == "ELEVATED_ERYTHEMA_DETECTED":
-                if severity == "moderate":
-                    score += 5
-                elif severity == "mild":
-                    score += 3
-                factors.append("Computer vision observation: elevated localized erythema/redness observed")
-            elif label == "POOR_IMAGE_QUALITY":
+        for img in evidence.image_observations:
+            if img.id.endswith("_poor_quality"):
                 factors.append("Visual quality notice: attached photograph has insufficient lighting or resolution")
+                struct_factors.append(StructuredFactor(
+                    factor_name="Computer Vision Quality Gate",
+                    finding="Insufficient resolution/lighting",
+                    source=EvidenceSource.IMAGE_CV.value,
+                    status=EvidenceStatus.UNKNOWN.value,
+                    direction=EvidenceDirection.UNKNOWN.value,
+                    rule_applied="Image quality gate failed (0 pts added, diagnostic notice issued)",
+                    rationale="Poor photographic quality cannot confirm or rule out visual lesions.",
+                    contribution_pts=0,
+                ))
+            elif img.id.endswith("_erythema"):
+                sev = img.details.get("severity") or "moderate"
+                inc = 5 if sev == "moderate" else 3
+                score += inc
+                factors.append("Computer vision observation: elevated localized erythema/redness observed")
+                struct_factors.append(StructuredFactor(
+                    factor_name="Visual Dermatological Inspection",
+                    finding=img.display_value,
+                    source=EvidenceSource.IMAGE_CV.value,
+                    status=EvidenceStatus.PRESENT.value,
+                    direction=EvidenceDirection.RISK_INCREASING.value,
+                    rule_applied=f"Erythema color ratio detection (+{inc} pts)",
+                    rationale="Objective superficial capillary engorgement consistent with local inflammation.",
+                    contribution_pts=inc,
+                ))
 
-        return min(8, score), factors
+        return min(8, score), factors, struct_factors
 
     def _generate_recommendation(self, risk_level: str, is_emergency: bool) -> str:
         """Generate compassionate, action-oriented, professional clinical recommendations."""

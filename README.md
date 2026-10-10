@@ -6,7 +6,7 @@
 [![React 19](https://img.shields.io/badge/react-19-blue.svg)](https://react.dev/)
 [![Vite](https://img.shields.io/badge/vite-6-purple.svg)](https://vite.dev/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Backend Tests](https://img.shields.io/badge/backend%20tests-130%20passed%20(100%25)-brightgreen.svg)]()
+[![Backend Tests](https://img.shields.io/badge/backend%20tests-140%20passed%20(100%25)-brightgreen.svg)]()
 [![Coverage](https://img.shields.io/badge/coverage-92%25-brightgreen.svg)]()
 
 ---
@@ -90,6 +90,15 @@ VetVision_AI/
   7. AI Health Risk Dial, Explainability Attribution, and Immediate Emergency Alerts
 - **One-Click Clinical Handoff Copy**: Formatted plain-text summary designed to be copied directly into clinic registration emails or portals.
 - **Comprehensive Management**: Dashboard metrics, Pet Profile Manager with edit/delete modals, and Reports Archive.
+
+### ✅ Step 8A — Evidence Normalization, Risk-Scoring Reliability & Explainability Upgrade
+- **Typed Evidence Modeling**: `NormalizedEvidence`, `EvidenceItem`, `EvidenceSource`, and explicit `EvidenceStatus` (`PRESENT`, `ABSENT`, `UNKNOWN`, `CONTRADICTORY`).
+- **Missing Data Safety**: Unobserved metrics, unanswered follow-ups, and unanalyzed photos strictly remain `UNKNOWN` and never imply healthy/reassuring findings.
+- **Robust Type Handling**: Safe parsers handle booleans, strings, and null observation values (`pain_observed`).
+- **Data Quality & Contradiction Detection**: `QualityChecker` flags conflicting clinical observations, chronicity anomalies (e.g., symptom duration exceeding pet age), and poor/missing photo quality gates.
+- **Granular Explainability Attribution**: `StructuredFactor` models provide exact source attribution, clinical direction (`risk-increasing`, `reassuring`, `unknown`, `emergency override`), applied rules, and verified contribution points.
+- **Emergency Hard-Stop Integrity**: Authoritative floor of 90 points and immediate triage emergency hard-stop cannot be downgraded or discounted by secondary findings.
+- **Immutable Audit Trail**: Zero schema migrations required; complete structured factor trees and data quality warnings stored within the versioned clinical snapshot.
 
 ---
 

@@ -18,7 +18,9 @@ class RiskAnalysisOutput:
     factor_breakdown: Dict[str, Any] = field(default_factory=dict)
     recommendation: str = ""
     is_emergency: bool = False
-    engine_version: str = "v1.0.0-rule_hybrid"
+    structured_factors: List[Dict[str, Any]] = field(default_factory=list)
+    data_quality_warnings: List[Dict[str, Any]] = field(default_factory=list)
+    engine_version: str = "v1.1.0-rule_explainable"
     disclaimer: str = (
         "This assessment is for early-warning support and does not replace "
         "professional veterinary diagnosis. If your pet is in acute distress, "
@@ -32,6 +34,8 @@ class RiskAnalysisOutput:
             "risk_score": self.risk_score,
             "key_factors": self.key_factors,
             "factor_breakdown": self.factor_breakdown,
+            "structured_factors": self.structured_factors,
+            "data_quality_warnings": self.data_quality_warnings,
             "recommendation": self.recommendation,
             "emergency": self.is_emergency,
             "is_emergency": self.is_emergency,

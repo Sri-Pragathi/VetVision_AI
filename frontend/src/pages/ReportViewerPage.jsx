@@ -130,7 +130,8 @@ DISCLAIMER: VetVision AI is an AI-assisted triage and early-warning tool, not a 
   const explainability = rd.explainability || [];
   const emergency = rd.emergency_evaluation || {};
   const recommendations = rd.recommendations || {};
-  const handoff = rd.veterinary_handoff || {};
+  const qualityWarnings = rd.data_quality_warnings || risk.data_quality_warnings || rd.risk_analysis?.factor_breakdown?.data_quality_warnings || [];
+  const structuredFactors = rd.structured_factors || risk.structured_factors || rd.risk_analysis?.factor_breakdown?.structured_factors || [];
 
   const isEmergency = Boolean(risk.is_emergency || emergency.is_emergency);
 
@@ -188,6 +189,30 @@ DISCLAIMER: VetVision AI is an AI-assisted triage and early-warning tool, not a 
             <EmergencyBanner
               message={emergency.status || 'Critical clinical indicators identified. Immediate veterinary medical attention recommended.'}
             />
+          </div>
+        )}
+
+        {/* Data Quality & Uncertainty Notices */}
+        {qualityWarnings && qualityWarnings.length > 0 && (
+          <div
+            style={{
+              marginBottom: '1.5rem',
+              padding: '1rem 1.25rem',
+              borderRadius: 'var(--radius-md)',
+              backgroundColor: '#fffbeb',
+              border: '1px solid #fde68a',
+            }}
+          >
+            <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#92400e', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <span>⚠️</span> Clinical Evidence Quality & Uncertainty Notices
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+              {qualityWarnings.map((w, wIdx) => (
+                <div key={wIdx} style={{ fontSize: '0.825rem', color: '#78350f', lineHeight: 1.4 }}>
+                  <strong>{w.title}:</strong> {w.message}
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
@@ -549,48 +574,124 @@ DISCLAIMER: VetVision AI is an AI-assisted triage and early-warning tool, not a 
           {/* Section 7: Explainable Contributing Factors */}
           <div style={{ marginBottom: '2rem' }}>
             <h2 style={{ fontSize: '1rem', fontWeight: 700, margin: '0 0 1rem 0', color: 'var(--color-primary)' }}>
-              7. Explainable Contributing Factors
+              7. Explainable Contributing Factors & Evidence Provenance
             </h2>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              {explainability.map((item, idx) => (
-                <div
-                  key={idx}
-                  style={{
-                    padding: '0.85rem 1.25rem',
-                    borderRadius: 'var(--radius-md)',
-                    backgroundColor: 'var(--color-surface)',
-                    border: '1px solid var(--color-border)',
-                    fontSize: '0.875rem',
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    justifyContent: 'space-between',
-                    gap: '1rem',
-                  }}
-                >
-                  <div>
-                    <div style={{ fontWeight: 700, color: 'var(--color-text-main)' }}>{item.factor}</div>
-                    <div style={{ color: 'var(--color-text-muted)', fontSize: '0.8rem', marginTop: '0.1rem' }}>
-                      {item.observed_finding || item.finding}
-                    </div>
-                    {item.explanation && (
-                      <div style={{ fontSize: '0.8rem', color: 'var(--color-text-main)', marginTop: '0.25rem' }}>
-                        💡 {item.explanation}
+
+            {structuredFactors && structuredFactors.length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                {structuredFactors.map((sf, idx) => {
+                  const isEmergency = sf.direction === 'emergency_override' || sf.is_emergency_flag;
+                  const isReassuring = sf.direction === 'reassuring';
+                  const isUnknown = sf.direction === 'unknown' || sf.status === 'UNKNOWN';
+
+                  return (
+                    <div
+                      key={idx}
+                      style={{
+                        padding: '0.85rem 1.25rem',
+                        borderRadius: 'var(--radius-md)',
+                        backgroundColor: isEmergency ? 'rgba(239, 68, 68, 0.05)' : isReassuring ? 'rgba(16, 185, 129, 0.05)' : 'var(--color-surface)',
+                        border: `1px solid ${isEmergency ? 'rgba(239, 68, 68, 0.25)' : isReassuring ? 'rgba(16, 185, 129, 0.25)' : 'var(--color-border)'}`,
+                        fontSize: '0.875rem',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem', marginBottom: '0.35rem' }}>
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                            <span style={{ fontWeight: 700, color: 'var(--color-text-main)' }}>{sf.factor_name}</span>
+                            <span
+                              style={{
+                                fontSize: '0.7rem',
+                                fontWeight: 700,
+                                textTransform: 'uppercase',
+                                padding: '0.15rem 0.45rem',
+                                borderRadius: 'var(--radius-sm)',
+                                backgroundColor: 'rgba(2, 132, 199, 0.12)',
+                                color: 'var(--color-primary)',
+                              }}
+                            >
+                              {sf.source?.replace('_', ' ') || 'CLINICAL'}
+                            </span>
+                            <span
+                              style={{
+                                fontSize: '0.7rem',
+                                fontWeight: 700,
+                                padding: '0.15rem 0.45rem',
+                                borderRadius: 'var(--radius-sm)',
+                                backgroundColor: isEmergency ? 'rgba(239, 68, 68, 0.15)' : isReassuring ? 'rgba(16, 185, 129, 0.15)' : isUnknown ? 'rgba(148, 163, 184, 0.2)' : 'rgba(234, 88, 12, 0.15)',
+                                color: isEmergency ? 'var(--color-danger)' : isReassuring ? 'var(--color-success)' : isUnknown ? '#64748b' : 'var(--color-warning)',
+                              }}
+                            >
+                              {isEmergency ? 'EMERGENCY OVERRIDE' : isReassuring ? 'REASSURING' : isUnknown ? 'UNKNOWN STATUS' : 'RISK INCREASING'}
+                            </span>
+                          </div>
+                          <div style={{ color: 'var(--color-text-muted)', fontSize: '0.85rem', marginTop: '0.2rem' }}>
+                            Finding: <strong>{sf.finding}</strong>
+                          </div>
+                        </div>
+
+                        {sf.contribution_pts !== null && sf.contribution_pts !== undefined ? (
+                          <span style={{ fontWeight: 800, fontSize: '0.85rem', color: 'var(--color-primary)', whiteSpace: 'nowrap' }}>
+                            +{sf.contribution_pts} pts
+                          </span>
+                        ) : isEmergency ? (
+                          <span style={{ fontWeight: 800, fontSize: '0.75rem', color: 'var(--color-danger)', whiteSpace: 'nowrap' }}>
+                            {"FLOOR >= 90"}
+                          </span>
+                        ) : null}
                       </div>
-                    )}
-                  </div>
-                  <span
+
+                      {sf.rationale && (
+                        <div style={{ fontSize: '0.8rem', color: 'var(--color-text-main)', marginTop: '0.35rem', lineHeight: 1.4 }}>
+                          💡 <em>{sf.rationale}</em>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                {explainability.map((item, idx) => (
+                  <div
+                    key={idx}
                     style={{
-                      fontWeight: 700,
-                      fontSize: '0.8rem',
-                      color: 'var(--color-primary)',
-                      whiteSpace: 'nowrap',
+                      padding: '0.85rem 1.25rem',
+                      borderRadius: 'var(--radius-md)',
+                      backgroundColor: 'var(--color-surface)',
+                      border: '1px solid var(--color-border)',
+                      fontSize: '0.875rem',
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      justifyContent: 'space-between',
+                      gap: '1rem',
                     }}
                   >
-                    {item.contribution}
-                  </span>
-                </div>
-              ))}
-            </div>
+                    <div>
+                      <div style={{ fontWeight: 700, color: 'var(--color-text-main)' }}>{item.factor}</div>
+                      <div style={{ color: 'var(--color-text-muted)', fontSize: '0.8rem', marginTop: '0.1rem' }}>
+                        {item.observed_finding || item.finding}
+                      </div>
+                      {item.explanation && (
+                        <div style={{ fontSize: '0.8rem', color: 'var(--color-text-main)', marginTop: '0.25rem' }}>
+                          💡 {item.explanation}
+                        </div>
+                      )}
+                    </div>
+                    <span
+                      style={{
+                        fontWeight: 700,
+                        fontSize: '0.8rem',
+                        color: 'var(--color-primary)',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {item.contribution}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Section 8: Clinical Next Steps & Veterinary Recommendation */}

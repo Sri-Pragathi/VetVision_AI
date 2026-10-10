@@ -145,6 +145,25 @@ class ReportHtmlRenderer:
         else:
             explain_html = "<p class='text-muted'>No specific explainability factors computed.</p>"
 
+        # Data Quality & Contradiction Warnings
+        quality_warnings = (
+            report_data.get("risk_analysis", {}).get("data_quality_warnings")
+            or report_data.get("data_quality_warnings")
+            or []
+        )
+        warnings_html = ""
+        if quality_warnings:
+            items_html = "".join([
+                f"<div style='margin-bottom: 8px;'><strong>⚠️ {cls._esc(w.get('title'))}:</strong> {cls._esc(w.get('message'))}</div>"
+                for w in quality_warnings
+            ])
+            warnings_html = f"""
+            <div style="background: #fffbeb; border-left: 4px solid #f59e0b; padding: 14px 18px; border-radius: 8px; margin-bottom: 20px; font-size: 13px; color: #92400e;">
+                <div style="font-weight: 700; margin-bottom: 6px;">Clinical Data Quality & Uncertainty Notices:</div>
+                {items_html}
+            </div>
+            """
+
         # Emergency banner
         emergency_banner = ""
         if is_emergency:
@@ -340,6 +359,7 @@ class ReportHtmlRenderer:
         </div>
 
         {emergency_banner}
+        {warnings_html}
 
         <!-- Risk Assessment Banner -->
         <div class="risk-banner">
