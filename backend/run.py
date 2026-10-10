@@ -12,11 +12,47 @@ if __name__ == "__main__":
         try:
             db.create_all()
             from app.models.symptom import seed_symptoms
-            seeded = seed_symptoms()
-            if seeded > 0:
-                app.logger.info(f"Seeded {seeded} clinical symptoms.")
+            from app.models.question_bank import seed_follow_up_questions
+            from app.models.user import User
+            from app.models.pet import Pet
+
+            seeded_sym = seed_symptoms()
+            if seeded_sym > 0:
+                app.logger.info(f"Seeded {seeded_sym} clinical symptoms.")
+
+            seeded_q = seed_follow_up_questions()
+            if seeded_q > 0:
+                app.logger.info(f"Seeded {seeded_q} clinical follow-up questions.")
+
+            # Seed safe local development demo account if in development mode
+            if env == "development":
+                demo_email = "john.doe@vetvision.ai"
+                demo_user = User.query.filter_by(email=demo_email).first()
+                if not demo_user:
+                    demo_password = os.getenv("DEV_DEMO_PASSWORD", "Password123!")
+                    demo_user = User(
+                        name="Dr. John Doe",
+                        email=demo_email,
+                        password=demo_password,
+                    )
+                    db.session.add(demo_user)
+                    db.session.commit()
+                    # Add initial demo pet
+                    demo_pet = Pet(
+                        owner_id=demo_user.id,
+                        name="Max",
+                        species="Dog",
+                        breed="Golden Retriever",
+                        sex="male",
+                        weight=31.5,
+                        allergies="None known",
+                        existing_conditions="None reported",
+                    )
+                    db.session.add(demo_pet)
+                    db.session.commit()
+                    app.logger.info("Initialized local development demo user and pet profile.")
         except Exception as e:
-            app.logger.warning(f"Could not auto-create tables or seed symptoms: {e}")
+            app.logger.warning(f"Could not complete database initialization: {e}")
 
     port = int(os.getenv("PORT", 5000))
     host = os.getenv("HOST", "0.0.0.0")

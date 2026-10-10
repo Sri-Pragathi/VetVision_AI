@@ -19,6 +19,23 @@ def create_app(config_name: Optional[str] = None) -> Flask:
     config_class = config_by_name.get(config_name, config_by_name["development"])
     application.config.from_object(config_class)
 
+    # Security Guard: Prevent production booting with fallback or dev secrets
+    if config_name == "production":
+        insecure_keys = {
+            "vetvision-ai-fallback-secret-key-32-chars",
+            "vetvision-ai-jwt-fallback-secret-key",
+            "vetvision-ai-dev-secret-key-super-secure-change-in-prod-2026",
+            "vetvision-jwt-dev-secret-key-32-chars-long-secure",
+            "change-this-to-a-very-secure-random-secret-key-in-production",
+            "change-this-jwt-secret-key-to-a-secure-random-string",
+        }
+        secret_key = application.config.get("SECRET_KEY")
+        jwt_key = application.config.get("JWT_SECRET_KEY")
+        if not secret_key or secret_key in insecure_keys:
+            raise ValueError("SECURITY CONFIGURATION ERROR: Production deployment requires a secure, non-default SECRET_KEY.")
+        if not jwt_key or jwt_key in insecure_keys:
+            raise ValueError("SECURITY CONFIGURATION ERROR: Production deployment requires a secure, non-default JWT_SECRET_KEY.")
+
     # Initialize extensions
     db.init_app(application)
     migrate.init_app(application, db)

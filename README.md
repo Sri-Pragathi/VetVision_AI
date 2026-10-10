@@ -106,6 +106,13 @@ VetVision_AI/
 - **Missing/Failed Photo Safety**: Unanalyzed or rejected photos are recorded as `UNKNOWN` with zero risk points and never imply a clean bill of health.
 - **Emergency Floor Inviolability**: A visually normal photograph can never cancel, discount, or delay care for critical clinical symptoms.
 
+### ✅ Step 8C — End-to-End Validation, Security Hardening & Innovation Day Demo Readiness
+- **Complete 16-Step User Journey Integration Suite**: Automated integration testing verifying the full user lifecycle from registration, pet profile creation, symptom intake, dynamic follow-up Q&A, and clinical observations, through photographic quality gate evaluation, risk scoring, versioned report generation, print-friendly rendering, and JWT logout/revocation.
+- **Runtime Question Bank Seeding**: Ensured all 200+ clinical follow-up questions and standard symptoms are automatically seeded on runtime startup (`python run.py`), guaranteeing an out-of-the-box working experience on fresh SQLite or PostgreSQL setups.
+- **Safe Development Demo Account Initializer**: Automatically provisions a clean local evaluation account (`john.doe@vetvision.ai` / `Password123!`) with sample pet `Max` on development boot, while enforcing that development demo helpers cannot bypass authentication or run in production.
+- **Production Secret Guard**: Hardened application factory to refuse booting in `production` mode if insecure fallback or placeholder secrets are detected in `.env`.
+- **Negative & Edge-Case Protection**: Verified multi-tenant isolation (403), cancelled assessment lifecycle locks, HTML XSS escaping, emergency override inviolability with reassuring photos, and immutable archived report snapshots.
+
 ---
 
 ## ⚡ Quick Start Guide
@@ -141,18 +148,18 @@ npm install
 # Start Vite development server
 npm run dev
 ```
-*Frontend runs on `http://localhost:5173` (proxies `/api` requests to Flask).*
+*Frontend runs on `http://localhost:3000` (proxies `/api` requests to Flask on port 5000).*
 
-### 3. Quick Demo Credentials (Pre-Seeded)
+### 3. Quick Demo Credentials (Pre-Seeded for Local Development)
 - **Email**: `john.doe@vetvision.ai`
-- **Password**: `Password123!`
+- **Password**: `Password123!` *(or configured via optional `DEV_DEMO_PASSWORD` in `.env`)*
 *(Or click the **"Quick-Fill Innovation Day Demo Credentials"** button on the Login page).*
 
 ---
 
 ## 🧪 Automated Testing & Verification
 
-Run the comprehensive Pytest backend suite (all 130 tests pass):
+Run the comprehensive Pytest backend suite (all 158 tests pass):
 
 ```bash
 cd backend
