@@ -9,6 +9,10 @@ class User(db.Model):
     """User database entity."""
     __tablename__ = "users"
 
+    ROLE_PET_OWNER = "pet_owner"
+    ROLE_DOCTOR = "doctor"
+    VALID_ROLES = {ROLE_PET_OWNER, ROLE_DOCTOR}
+
     id = db.Column(
         db.String(36),
         primary_key=True,
@@ -18,6 +22,12 @@ class User(db.Model):
     name = db.Column(db.String(100), nullable=False)
     email = db.Column(db.String(255), unique=True, nullable=False, index=True)
     password_hash = db.Column(db.String(255), nullable=False)
+    role = db.Column(
+        db.String(20),
+        nullable=False,
+        default=ROLE_PET_OWNER,
+        server_default=ROLE_PET_OWNER,
+    )
     
     created_at = db.Column(
         db.DateTime(timezone=True),
@@ -39,11 +49,12 @@ class User(db.Model):
         lazy="select",
     )
 
-    def __init__(self, name: str, email: str, password: str, id: str = None):
+    def __init__(self, name: str, email: str, password: str, role: str = ROLE_PET_OWNER, id: str = None):
         if id:
             self.id = id
         self.name = name.strip()
         self.email = email.strip().lower()
+        self.role = role if role in self.VALID_ROLES else self.ROLE_PET_OWNER
         self.set_password(password)
 
     def set_password(self, password: str) -> None:
@@ -60,6 +71,7 @@ class User(db.Model):
             "id": self.id,
             "name": self.name,
             "email": self.email,
+            "role": self.role or self.ROLE_PET_OWNER,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }

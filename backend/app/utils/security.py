@@ -22,3 +22,28 @@ def check_password(password: str, hashed_password: str) -> bool:
         )
     except Exception:
         return False
+
+
+def doctor_required():
+    """Route decorator enforcing authenticated Doctor role from JWT claims."""
+    from functools import wraps
+    from flask_jwt_extended import get_jwt, get_jwt_identity
+    from app.utils.error_handlers import ForbiddenException
+    from app.extensions import db
+    from app.models.user import User
+
+    def wrapper(fn):
+        @wraps(fn)
+        def decorator(*args, **kwargs):
+            claims = get_jwt()
+            role = claims.get("role")
+            if not role:
+                user_id = get_jwt_identity()
+                user = db.session.get(User, user_id)
+                role = user.role if user else None
+            if role != User.ROLE_DOCTOR:
+                raise ForbiddenException("Doctor access required for this endpoint.")
+            return fn(*args, **kwargs)
+        return decorator
+    return wrapper
+

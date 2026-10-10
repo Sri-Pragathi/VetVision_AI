@@ -54,10 +54,10 @@ function ProtectedRoute({ children }) {
 
 /**
  * PublicOnlyRoute component: redirects already authenticated users
- * away from login/register pages directly to /dashboard.
+ * away from login/register pages to their respective portal (/doctor/dashboard or /dashboard).
  */
 function PublicOnlyRoute({ children }) {
-  const { isAuthenticated, isLoading, accessToken } = useAuth();
+  const { isAuthenticated, isLoading, isDoctor, accessToken } = useAuth();
   const token = accessToken || localStorage.getItem('vetvision_access_token');
   const hasValidToken = Boolean(token && token !== 'undefined' && token !== 'null');
 
@@ -77,6 +77,45 @@ function PublicOnlyRoute({ children }) {
   }
 
   if (isAuthenticated || hasValidToken) {
+    if (isDoctor) {
+      return <Navigate to="/doctor/dashboard" replace />;
+    }
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return children;
+}
+
+/**
+ * DoctorRoute component: verifies doctor role and redirects non-doctors to owner dashboard.
+ */
+function DoctorRoute({ children }) {
+  const { isAuthenticated, isLoading, isDoctor, accessToken } = useAuth();
+  const location = useLocation();
+
+  const token = accessToken || localStorage.getItem('vetvision_access_token');
+  const hasValidToken = Boolean(token && token !== 'undefined' && token !== 'null');
+
+  if (isLoading) {
+    return (
+      <div
+        style={{
+          minHeight: '60vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <LoadingSpinner message="Verifying doctor credentials..." />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated && !hasValidToken) {
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  if (!isDoctor) {
     return <Navigate to="/dashboard" replace />;
   }
 

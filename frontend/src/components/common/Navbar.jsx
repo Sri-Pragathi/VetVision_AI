@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 
 export const Navbar = () => {
-  const { user, isAuthenticated, logout } = useAuth();
+  const { user, isAuthenticated, isDoctor, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -44,7 +44,7 @@ export const Navbar = () => {
         justifyContent: 'space-between',
       }}>
         {/* Brand */}
-        <Link to={isAuthenticated ? "/dashboard" : "/"} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <Link to={isAuthenticated ? (isDoctor ? "/doctor/dashboard" : "/dashboard") : "/"} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <div style={{
             width: '38px',
             height: '38px',
@@ -72,37 +72,67 @@ export const Navbar = () => {
         <nav style={{ display: 'flex', alignItems: 'center', gap: '8px' }} className="desktop-nav">
           {isAuthenticated ? (
             <>
-              <Link 
-                to="/dashboard" 
-                className={`btn btn-sm ${isActive('/dashboard') ? 'btn-secondary' : ''}`}
-                style={{ color: isActive('/dashboard') ? 'var(--primary)' : 'var(--text-muted)' }}
-              >
-                <LayoutDashboard size={16} />
-                Dashboard
-              </Link>
-              <Link 
-                to="/pets" 
-                className={`btn btn-sm ${isActive('/pets') ? 'btn-secondary' : ''}`}
-                style={{ color: isActive('/pets') ? 'var(--primary)' : 'var(--text-muted)' }}
-              >
-                <FolderHeart size={16} />
-                My Pets
-              </Link>
-              <Link 
-                to="/reports" 
-                className={`btn btn-sm ${isActive('/reports') ? 'btn-secondary' : ''}`}
-                style={{ color: isActive('/reports') ? 'var(--primary)' : 'var(--text-muted)' }}
-              >
-                <FileText size={16} />
-                Reports
-              </Link>
-              
-              <div style={{ width: '1px', height: '24px', backgroundColor: 'var(--border-light)', margin: '0 4px' }} />
+              {isDoctor ? (
+                <>
+                  <Link 
+                    to="/doctor/dashboard" 
+                    className={`btn btn-sm ${isActive('/doctor/dashboard') ? 'btn-secondary' : ''}`}
+                    style={{ color: isActive('/doctor/dashboard') ? 'var(--primary)' : 'var(--text-muted)' }}
+                  >
+                    <LayoutDashboard size={16} />
+                    Patient Cases
+                  </Link>
+                  <div style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    padding: '3px 8px',
+                    borderRadius: 'var(--radius-full)',
+                    backgroundColor: '#ecfdf5',
+                    color: '#065f46',
+                    fontSize: '11px',
+                    fontWeight: '700',
+                    border: '1px solid #a7f3d0'
+                  }}>
+                    <ShieldCheck size={13} />
+                    Doctor Portal
+                  </div>
+                </>
+              ) : (
+                <>
+                  <Link 
+                    to="/dashboard" 
+                    className={`btn btn-sm ${isActive('/dashboard') ? 'btn-secondary' : ''}`}
+                    style={{ color: isActive('/dashboard') ? 'var(--primary)' : 'var(--text-muted)' }}
+                  >
+                    <LayoutDashboard size={16} />
+                    Dashboard
+                  </Link>
+                  <Link 
+                    to="/pets" 
+                    className={`btn btn-sm ${isActive('/pets') ? 'btn-secondary' : ''}`}
+                    style={{ color: isActive('/pets') ? 'var(--primary)' : 'var(--text-muted)' }}
+                  >
+                    <FolderHeart size={16} />
+                    My Pets
+                  </Link>
+                  <Link 
+                    to="/reports" 
+                    className={`btn btn-sm ${isActive('/reports') ? 'btn-secondary' : ''}`}
+                    style={{ color: isActive('/reports') ? 'var(--primary)' : 'var(--text-muted)' }}
+                  >
+                    <FileText size={16} />
+                    Reports
+                  </Link>
+                  
+                  <div style={{ width: '1px', height: '24px', backgroundColor: 'var(--border-light)', margin: '0 4px' }} />
 
-              <Link to="/assessments/new" className="btn btn-primary btn-sm">
-                <PlusCircle size={16} />
-                New Assessment
-              </Link>
+                  <Link to="/assessments/new" className="btn btn-primary btn-sm">
+                    <PlusCircle size={16} />
+                    New Assessment
+                  </Link>
+                </>
+              )}
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: '8px' }}>
                 <div style={{

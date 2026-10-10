@@ -106,10 +106,16 @@ export const AuthProvider = ({ children }) => {
 
   const storedToken = localStorage.getItem('vetvision_access_token');
   const isTokenValid = Boolean(storedToken && storedToken !== 'undefined' && storedToken !== 'null');
+  const role = user?.role || 'pet_owner';
+  const isDoctor = role === 'doctor';
+  const isOwner = role === 'pet_owner';
 
   const value = {
     user,
     accessToken,
+    role,
+    isDoctor,
+    isOwner,
     isAuthenticated: Boolean((accessToken || isTokenValid) && (user || localStorage.getItem('vetvision_user'))),
     isLoading,
     login,

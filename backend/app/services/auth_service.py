@@ -22,17 +22,25 @@ class AuthService:
         if existing:
             raise ConflictException("An account with this email address already exists.")
 
+        # Public registration always creates pet_owner accounts
         user = User(
             name=data["name"].strip(),
             email=email,
             password=data["password"],
+            role=User.ROLE_PET_OWNER,
         )
         db.session.add(user)
         db.session.commit()
 
-        # Generate tokens
-        access_token = create_access_token(identity=user.id)
-        refresh_token = create_refresh_token(identity=user.id)
+        # Generate tokens with role claims
+        access_token = create_access_token(
+            identity=user.id,
+            additional_claims={"role": user.role},
+        )
+        refresh_token = create_refresh_token(
+            identity=user.id,
+            additional_claims={"role": user.role},
+        )
 
         response_data = {
             "user": user.to_dict(),
@@ -54,8 +62,14 @@ class AuthService:
         if not user or not user.check_password(password):
             raise UnauthorizedException("Invalid email or password.")
 
-        access_token = create_access_token(identity=user.id)
-        refresh_token = create_refresh_token(identity=user.id)
+        access_token = create_access_token(
+            identity=user.id,
+            additional_claims={"role": user.role},
+        )
+        refresh_token = create_refresh_token(
+            identity=user.id,
+            additional_claims={"role": user.role},
+        )
 
         response_data = {
             "user": user.to_dict(),
@@ -74,7 +88,10 @@ class AuthService:
         if not user:
             raise NotFoundException("User associated with this token not found.")
 
-        new_access_token = create_access_token(identity=user.id)
+        new_access_token = create_access_token(
+            identity=user.id,
+            additional_claims={"role": user.role},
+        )
         return {
             "access_token": new_access_token,
             "token_type": "Bearer",

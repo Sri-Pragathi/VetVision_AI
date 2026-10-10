@@ -51,6 +51,21 @@ if __name__ == "__main__":
                     db.session.add(demo_pet)
                     db.session.commit()
                     app.logger.info("Initialized local development demo user and pet profile.")
+
+                # Seed doctor account in development mode if missing
+                demo_doc_email = os.getenv("DEV_DOCTOR_EMAIL", "doctor@vetvision.ai")
+                demo_doctor = User.query.filter_by(email=demo_doc_email).first()
+                if not demo_doctor:
+                    demo_doc_password = os.getenv("DEV_DOCTOR_PASSWORD", "Doctor123!Secure")
+                    demo_doctor = User(
+                        name="Dr. Sarah Smith, DVM",
+                        email=demo_doc_email,
+                        password=demo_doc_password,
+                        role=User.ROLE_DOCTOR,
+                    )
+                    db.session.add(demo_doctor)
+                    db.session.commit()
+                    app.logger.info("Initialized local development doctor account.")
         except Exception as e:
             app.logger.warning(f"Could not complete database initialization: {e}")
 

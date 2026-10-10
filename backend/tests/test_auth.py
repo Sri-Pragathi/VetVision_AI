@@ -119,3 +119,65 @@ def test_logout_revokes_token(client, registered_user):
     me_res = client.get("/api/v1/auth/me", headers=registered_user["headers"])
     assert me_res.status_code == 401
     assert "revoked" in me_res.get_json()["message"].lower()
+
+
+def test_registration_assigns_pet_owner_role_by_default(client):
+    """Verify that public registration always assigns pet_owner role by default."""
+    payload = {
+        "name": "Standard Pet Parent",
+        "email": "petparent@example.com",
+        "password": "Password123!",
+    }
+    response = client.post("/api/v1/auth/register", json=payload)
+    assert response.status_code == 201
+    data = response.get_json()["data"]
+    assert data["user"]["role"] == "pet_owner", "Role must be pet_owner for public registration"
+
+    # Verify /auth/me reflects pet_owner
+    headers = {"Authorization": f"Bearer {data['tokens']['access_token']}"}
+    me_res = client.get("/api/v1/auth/me", headers=headers)
+    assert me_res.status_code == 200
+    assert me_res.get_json()["data"]["role"] == "pet_owner"
+
+
+def test_registration_blocks_doctor_role_self_assignment(client):
+    """Verify that public registration rejects attempts to self-assign a role."""
+    payload = {
+        "name": "Attacker Trying Doctor Role",
+        "email": "attacker@example.com",
+        "password": "Password123!",
+        "role": "doctor",  # Unauthorized parameter
+    }
+    response = client.post("/api/v1/auth/register", json=payload)
+    assert response.status_code == 422
+    assert response.get_json()["success"] is False
+
+
+def test_doctor_user_creation_and_jwt_claims(client, app):
+    """Verify authorized doctor creation has role 'doctor' in user profile and JWT claims."""
+    from app.extensions import db
+    from app.models.user import User
+
+    with app.app_context():
+        doctor = User(
+            name="Dr. Gregory House, DVM",
+            email="house@vetvision.ai",
+            password="DoctorPassword123!",
+            role=User.ROLE_DOCTOR,
+        )
+        db.session.add(doctor)
+        db.session.commit()
+
+        login_res = client.post("/api/v1/auth/login", json={
+            "email": "house@vetvision.ai",
+            "password": "DoctorPassword123!",
+        })
+        assert login_res.status_code == 200
+        data = login_res.get_json()["data"]
+        assert data["user"]["role"] == "doctor"
+
+        headers = {"Authorization": f"Bearer {data['tokens']['access_token']}"}
+        me_res = client.get("/api/v1/auth/me", headers=headers)
+        assert me_res.status_code == 200
+        assert me_res.get_json()["data"]["role"] == "doctor"
+
