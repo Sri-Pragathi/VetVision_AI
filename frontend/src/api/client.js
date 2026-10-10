@@ -1,7 +1,19 @@
 import axios from 'axios';
 
-// The Vite dev server proxies /api to http://127.0.0.1:5000
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
+function resolveApiBaseUrl(raw) {
+  if (!raw || !raw.trim()) {
+    return '/api/v1';
+  }
+  let val = raw.trim().replace(/\/+$/, '');
+  if (val.startsWith('http') && !val.includes('/api/v1')) {
+    val = `${val}/api/v1`;
+  }
+  return val;
+}
+
+// In local dev, defaults to '/api/v1' (proxied by Vite to http://127.0.0.1:5000).
+// In production, can be set via build-time env var VITE_API_BASE_URL.
+export const API_BASE_URL = resolveApiBaseUrl(import.meta.env.VITE_API_BASE_URL);
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,

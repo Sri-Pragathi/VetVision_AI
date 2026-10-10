@@ -955,7 +955,29 @@ Step 8C delivers comprehensive end-to-end integration verification, security aud
 
 ---
 
-## 19. Implementation Roadmap
+## 19. Step 9 — Deployment Readiness, Production WSGI & Security Hardening
+
+### Production Architecture & Prerequisites
+
+1. **Explicit Multi-Origin CORS Configuration**:
+   - `CORS_ORIGINS` supports comma-separated URLs (e.g., `https://app.vetvision.ai,https://admin.vetvision.ai`).
+   - In `production` mode, wildcards (`*`) and empty configurations are rejected by the security guard.
+2. **Explicit Database Seeding CLI (`flask seed-db`)**:
+   - Production deployments do not rely on local development server auto-seeding.
+   - Run `flask seed-db` after `flask db upgrade` in automated CI/CD release phases. Seeding is strictly idempotent.
+3. **Production WSGI Server (Gunicorn)**:
+   - Run using: `gunicorn -w 2 -b 0.0.0.0:$PORT run:app`
+   - Configured via `backend/Procfile`.
+4. **Health & Liveness Probes**:
+   - `GET /api/v1/health`: Checks backend service status and tests database connectivity (`SELECT 1`). Returns 200 when healthy, 503 if database is disconnected, without leaking internal secrets.
+   - `GET /api/v1/health/live`: Fast process liveness check for container orchestrators.
+   - `GET /api/v1/health/ready`: Dependency readiness probe.
+5. **Storage Considerations**:
+   - Local filesystem storage (`uploads/`) is suitable for single-instance evaluation. In multi-instance or serverless/ephemeral container environments, attached persistent storage volumes or S3-compatible object storage is recommended.
+
+---
+
+## 20. Implementation Roadmap
 
 | Step | Description | Status |
 |---|---|---|
@@ -969,3 +991,5 @@ Step 8C delivers comprehensive end-to-end integration verification, security aud
 | **Step 8A** | Intelligence & Explainability Upgrade — Evidence Normalization, Contradictions, Clamped Attribution | ✅ Complete |
 | **Step 8B** | Enhanced CV & Image Reliability — Quality Metrics, Guidance, Duplicate Prevention | ✅ Complete |
 | **Step 8C** | E2E Journey Validation, Security Hardening & Demo Readiness | ✅ Complete |
+| **Step 9A** | Final Deployment Readiness Audit | ✅ Complete |
+| **Step 9B** | Deployment Fixes — CORS Parsing, CLI Seeding, SPA Routing & Production WSGI | ✅ Complete |

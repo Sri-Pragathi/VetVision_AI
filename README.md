@@ -113,47 +113,66 @@ VetVision_AI/
 - **Production Secret Guard**: Hardened application factory to refuse booting in `production` mode if insecure fallback or placeholder secrets are detected in `.env`.
 - **Negative & Edge-Case Protection**: Verified multi-tenant isolation (403), cancelled assessment lifecycle locks, HTML XSS escaping, emergency override inviolability with reassuring photos, and immutable archived report snapshots.
 
+### ✅ Step 9 — Deployment Readiness, Production WSGI & Security Hardening
+- **Multi-Origin CORS Parsing**: Robust parsing of comma-separated `CORS_ORIGINS` with whitespace trimming. Rejects wildcard `*` and unconfigured origins in production mode.
+- **Explicit Database Seeding CLI (`flask seed-db`)**: Dedicated CLI command for automated CI/CD and release pipelines to seed symptoms and question banks idempotently without altering schemas.
+- **Production WSGI Entrypoint**: Production Procfile (`web: gunicorn -w 2 -b 0.0.0.0:$PORT run:app`) for high-concurrency cloud environments.
+- **Static Frontend SPA Routing**: Added `_redirects` and `vercel.json` rewrite fallbacks preventing 404s on browser reloads and deep links.
+- **Health Check & Readiness Probes**: Extended `/api/v1/health` with safe database connection probes (`SELECT 1`), plus dedicated `/health/live` and `/health/ready` endpoints without credential leakage.
+
 ---
 
 ## ⚡ Quick Start Guide
 
-### 1. Start the Flask Backend
+### 1. Local Development (Flask + Vite)
 
 ```bash
-# Navigate to backend
+# Backend setup
 cd backend
-
-# Create & activate virtual environment (Windows PowerShell)
 python -m venv venv
 .\venv\Scripts\Activate.ps1
-
-# Install dependencies
 pip install -r requirements.txt
-
-# Run database migrations & seed symptoms/questions
 flask db upgrade
 python run.py
 ```
 *Backend runs on `http://127.0.0.1:5000`.*
 
-### 2. Start the React Frontend
-
 ```bash
-# Open a new terminal in the frontend directory
+# Frontend setup
 cd frontend
-
-# Install dependencies
 npm install
-
-# Start Vite development server
 npm run dev
 ```
 *Frontend runs on `http://localhost:3000` (proxies `/api` requests to Flask on port 5000).*
 
-### 3. Quick Demo Credentials (Pre-Seeded for Local Development)
+### 2. Quick Demo Credentials (Pre-Seeded for Local Development)
 - **Email**: `john.doe@vetvision.ai`
 - **Password**: `Password123!` *(or configured via optional `DEV_DEMO_PASSWORD` in `.env`)*
 *(Or click the **"Quick-Fill Innovation Day Demo Credentials"** button on the Login page).*
+
+### 3. Production Deployment Sequence
+
+When deploying to cloud platforms (such as Render, Vercel, Railway, or Docker):
+
+1. **Configure Environment Variables**:
+   - `FLASK_ENV=production`
+   - `SECRET_KEY` & `JWT_SECRET_KEY`: Set to strong, unique 32+ character strings (production refuses to boot with defaults).
+   - `DATABASE_URL`: Managed PostgreSQL connection string (e.g., Neon or Render PostgreSQL, typically requiring `?sslmode=require`).
+   - `CORS_ORIGINS`: Comma-separated allowed frontend domain(s) (e.g., `https://vetvision.vercel.app`).
+   - `VITE_API_BASE_URL`: Public backend API URL (embedded at frontend build time).
+2. **Apply Database Migrations**:
+   ```bash
+   flask db upgrade
+   ```
+3. **Execute Clinical Seeding Command**:
+   ```bash
+   flask seed-db
+   ```
+4. **Start Production WSGI Server**:
+   ```bash
+   gunicorn -w 2 -b 0.0.0.0:$PORT run:app
+   ```
+5. **Storage Notice**: Local filesystem storage (`uploads/`) is suitable for single-instance setups. For multi-instance horizontal scaling or ephemeral containers, mount a persistent volume or connect S3-compatible object storage.
 
 ---
 

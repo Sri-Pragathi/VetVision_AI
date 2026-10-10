@@ -2,11 +2,50 @@
 import os
 from datetime import timedelta
 from pathlib import Path
+from typing import Union, List, Any, Optional
 from dotenv import load_dotenv
 
 # Load .env file from backend root
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env")
+
+
+def parse_cors_origins(raw_origins: Any, env: str = "development") -> Union[List[str], str]:
+    """Parse comma-separated CORS_ORIGINS into a clean list of allowed origins.
+
+    - In development/testing: falls back to '*' if unset, empty, or whitespace.
+    - In production: strictly enforces explicit non-wildcard origins, raising
+      ValueError on missing, empty, or wildcard configurations.
+    """
+    if raw_origins is None:
+        if env == "production":
+            raise ValueError(
+                "SECURITY CONFIGURATION ERROR: Production deployment requires explicit, non-empty CORS_ORIGINS."
+            )
+        return "*"
+
+    if isinstance(raw_origins, (list, tuple, set)):
+        origins = [str(o).strip() for o in raw_origins if str(o).strip()]
+    elif isinstance(raw_origins, str):
+        origins = [o.strip() for o in raw_origins.split(",") if o.strip()]
+    else:
+        origins = []
+
+    if not origins:
+        if env == "production":
+            raise ValueError(
+                "SECURITY CONFIGURATION ERROR: Production deployment requires non-empty CORS_ORIGINS."
+            )
+        return "*"
+
+    if "*" in origins:
+        if env == "production":
+            raise ValueError(
+                "SECURITY CONFIGURATION ERROR: Wildcard '*' CORS origin is not permitted in production."
+            )
+        return "*"
+
+    return origins
 
 
 def get_database_url() -> str:

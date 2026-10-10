@@ -44,9 +44,30 @@ def create_app(config_name: Optional[str] = None) -> Flask:
     # Import models so Alembic and SQLAlchemy register metadata
     import app.models  # noqa: F401
 
+    from app.config import parse_cors_origins
+
     # Configure CORS
-    cors_origins = application.config.get("CORS_ORIGINS", "*")
+    raw_cors = os.getenv("CORS_ORIGINS", application.config.get("CORS_ORIGINS", "*"))
+    cors_origins = parse_cors_origins(raw_cors, env=config_name)
+    application.config["CORS_ORIGINS"] = cors_origins
     cors.init_app(application, resources={r"/api/*": {"origins": cors_origins}})
+
+    # Register CLI commands
+    @application.cli.command("seed-db")
+    def seed_db_command():
+        """Seed symptom catalog and clinical follow-up question bank idempotently."""
+        import click
+        from app.models.symptom import seed_symptoms
+        from app.models.question_bank import seed_follow_up_questions
+
+        click.echo("Seeding clinical symptoms...")
+        seeded_sym = seed_symptoms()
+        click.echo(f"Clinical symptoms seeded: {seeded_sym}")
+
+        click.echo("Seeding clinical follow-up questions...")
+        seeded_q = seed_follow_up_questions()
+        click.echo(f"Follow-up questions seeded: {seeded_q}")
+        click.echo("Database seeding completed successfully.")
 
     # JWT Token blocklist callback for logout checking
     @jwt.token_in_blocklist_loader

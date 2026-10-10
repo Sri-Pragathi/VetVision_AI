@@ -19,6 +19,7 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import { reportApi } from '../api/reportApi';
+import { API_BASE_URL } from '../api/client';
 import TriageBadge from '../components/common/TriageBadge';
 import EmergencyBanner from '../components/common/EmergencyBanner';
 import LoadingSpinner from '../components/common/LoadingSpinner';
@@ -94,7 +95,7 @@ DISCLAIMER: VetVision AI is an AI-assisted triage and early-warning tool, not a 
   };
 
   const handleViewHtml = () => {
-    window.open(`/api/v1/reports/${id}/html`, '_blank');
+    window.open(`${API_BASE_URL}/reports/${id}/html`, '_blank');
   };
 
   if (loading) {
