@@ -21,6 +21,7 @@ import TriageBadge from '../components/common/TriageBadge';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import ErrorMessage from '../components/common/ErrorMessage';
 import Modal from '../components/common/Modal';
+import { DAILY_LIFE_SPECIES, getSpeciesEmoji } from '../utils/petSpecies';
 
 export default function PetDetailPage() {
   const { id } = useParams();
@@ -80,16 +81,30 @@ export default function PetDetailPage() {
     try {
       setSavingEdit(true);
       setEditError(null);
+      const finalSpecies =
+        editFormData.species === 'Other' && editFormData.custom_species?.trim()
+          ? editFormData.custom_species.trim()
+          : (editFormData.species || 'Dog');
+
       const payload = {
-        ...editFormData,
-        age_years: editFormData.age_years ? parseFloat(editFormData.age_years) : null,
-        weight_kg: editFormData.weight_kg ? parseFloat(editFormData.weight_kg) : null,
+        name: editFormData.name ? editFormData.name.trim() : '',
+        species: finalSpecies,
+        breed: editFormData.breed?.trim() ? editFormData.breed.trim() : null,
+        sex: editFormData.sex || editFormData.gender || null,
+        date_of_birth: editFormData.date_of_birth?.trim() ? editFormData.date_of_birth.trim() : null,
+        weight: editFormData.weight && !isNaN(parseFloat(editFormData.weight))
+          ? parseFloat(editFormData.weight)
+          : (editFormData.weight_kg && !isNaN(parseFloat(editFormData.weight_kg)) ? parseFloat(editFormData.weight_kg) : null),
+        allergies: editFormData.allergies?.trim() || editFormData.known_allergies?.trim() || null,
+        existing_conditions: editFormData.existing_conditions?.trim() || editFormData.chronic_conditions?.trim() || null,
+        current_medications: editFormData.current_medications?.trim() || null,
+        vaccination_status: editFormData.vaccination_status?.trim() || null,
       };
       const res = await petApi.updatePet(id, payload);
       setPet(res.data || res);
       setShowEditModal(false);
     } catch (err) {
-      setEditError(err.response?.data?.message || 'Failed to update pet.');
+      setEditError(err.response?.data?.message || err.message || 'Failed to update pet.');
     } finally {
       setSavingEdit(false);
     }
@@ -101,7 +116,7 @@ export default function PetDetailPage() {
       await petApi.deletePet(id);
       navigate('/pets');
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to delete pet.');
+      alert(err.response?.data?.message || err.message || 'Failed to delete pet.');
       setDeleting(false);
     }
   };
@@ -129,7 +144,7 @@ export default function PetDetailPage() {
     );
   }
 
-  const speciesEmoji = pet.species?.toLowerCase() === 'cat' ? '🐱' : pet.species?.toLowerCase() === 'dog' ? '🐶' : '🐾';
+  const speciesEmoji = getSpeciesEmoji(pet.species);
 
   return (
     <div style={{ backgroundColor: 'var(--color-bg)', minHeight: 'calc(100vh - 140px)', padding: '2rem 0 4rem' }}>
@@ -338,7 +353,9 @@ export default function PetDetailPage() {
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
               {assessments.map((a) => {
-                const dateStr = a.created_at ? new Date(a.created_at).toLocaleDateString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : 'Unknown date';
+                const dateStr = a.created_at
+                  ? new Date(a.created_at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+                  : 'Unknown date';
                 const triageLevel = a.triage_level || a.risk_analysis?.triage_level || 'pending';
                 const score = a.risk_score ?? a.risk_analysis?.risk_score;
 
@@ -435,12 +452,14 @@ export default function PetDetailPage() {
               <label className="form-label">Species *</label>
               <select
                 className="form-input"
-                value={editFormData.species || 'dog'}
+                value={editFormData.species || 'Dog'}
                 onChange={(e) => setEditFormData({ ...editFormData, species: e.target.value })}
               >
-                <option value="dog">Dog</option>
-                <option value="cat">Cat</option>
-                <option value="other">Other</option>
+                {DAILY_LIFE_SPECIES.map((s) => (
+                  <option key={s.value} value={s.value}>
+                    {s.label}
+                  </option>
+                ))}
               </select>
             </div>
             <div>
@@ -448,11 +467,26 @@ export default function PetDetailPage() {
               <input
                 type="text"
                 className="form-input"
+                placeholder="e.g. Mixed, Golden Retriever"
                 value={editFormData.breed || ''}
                 onChange={(e) => setEditFormData({ ...editFormData, breed: e.target.value })}
               />
             </div>
           </div>
+
+          {editFormData.species === 'Other' && (
+            <div style={{ marginTop: '0.75rem' }}>
+              <label className="form-label">Specify Custom Species *</label>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="e.g. Chinchilla, Hedgehog, Duck"
+                value={editFormData.custom_species || ''}
+                onChange={(e) => setEditFormData({ ...editFormData, custom_species: e.target.value })}
+                required
+              />
+            </div>
+          )}
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
             <div>

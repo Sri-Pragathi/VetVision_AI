@@ -102,6 +102,27 @@ def submit_answer(assessment_id: str):
     )
 
 
+@answer_bp.route("/<string:assessment_id>/answers", methods=["PUT"])
+@jwt_required()
+def update_answer(assessment_id: str):
+    """Update an answer to a follow-up question for an assessment."""
+    user_id = get_jwt_identity()
+    payload = request.get_json(silent=True) or {}
+    validated_data = answer_submit_schema.load(payload)
+
+    result = AnswerService.update_answer(
+        assessment_id=assessment_id,
+        user_id=user_id,
+        data=validated_data,
+    )
+
+    return success_response(
+        data=result,
+        message="Answer updated successfully",
+        status_code=200,
+    )
+
+
 @answer_bp.route("/<string:assessment_id>/answers", methods=["GET"])
 @jwt_required()
 def get_answers(assessment_id: str):

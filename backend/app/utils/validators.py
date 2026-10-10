@@ -12,9 +12,12 @@ ALLOWED_SEX_CHOICES = {
     "male",
     "female",
     "male neutered",
+    "male intact",
     "female spayed",
+    "female intact",
     "neutered",
     "spayed",
+    "intact",
     "unknown",
 }
 

@@ -69,6 +69,24 @@ def list_reports(assessment_id: str):
     )
 
 
+@report_bp.route("", methods=["GET"])
+@jwt_required()
+def list_user_reports():
+    """List all reports belonging to the authenticated user across all pets.
+
+    Returns:
+        200: List of report summaries.
+        401: Unauthorized.
+    """
+    user_id = get_jwt_identity()
+    reports = ReportService.get_user_reports(user_id=user_id)
+    return success_response(
+        data=reports,
+        message="User reports retrieved successfully",
+        status_code=200,
+    )
+
+
 @report_bp.route("/<string:report_id>", methods=["GET"])
 @jwt_required()
 def get_report(report_id: str):

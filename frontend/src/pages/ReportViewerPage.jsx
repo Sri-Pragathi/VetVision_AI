@@ -25,6 +25,17 @@ import EmergencyBanner from '../components/common/EmergencyBanner';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import ErrorMessage from '../components/common/ErrorMessage';
 
+const formatDuration = (duration, durationDisplay) => {
+  if (durationDisplay) return String(durationDisplay);
+  if (!duration) return 'Not specified';
+  if (typeof duration === 'object') {
+    const val = duration.value != null ? duration.value : '';
+    const unit = duration.unit != null ? duration.unit : '';
+    return `${val} ${unit}`.trim() || 'Not specified';
+  }
+  return String(duration);
+};
+
 export default function ReportViewerPage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -55,9 +66,9 @@ export default function ReportViewerPage() {
     if (!report) return;
     const rd = report.report_data || {};
     const handoff = rd.veterinary_handoff || {};
-    const pet = rd.pet_profile || {};
+    const pet = rd.pet || rd.pet_profile || {};
     const risk = rd.risk_analysis || {};
-    const emergency = rd.emergency_evaluation || {};
+    const emergency = rd.emergency || rd.emergency_evaluation || {};
 
     const textToCopy = `--- VETVISION AI CLINICAL HANDOFF SUMMARY ---
 PATIENT: ${handoff.patient || pet.name || 'Pet'}
@@ -122,19 +133,32 @@ DISCLAIMER: VetVision AI is an AI-assisted triage and early-warning tool, not a 
   }
 
   const rd = report.report_data || {};
-  const pet = rd.pet_profile || {};
-  const symptoms = rd.reported_symptoms || [];
-  const followUp = rd.adaptive_follow_up_findings || [];
-  const observations = rd.clinical_observations || {};
-  const images = rd.image_analysis || [];
+  const pet = rd.pet || rd.pet_profile || {};
+  const symptoms = Array.isArray(rd.symptoms) ? rd.symptoms : (Array.isArray(rd.reported_symptoms) ? rd.reported_symptoms : []);
+  const followUp = Array.isArray(rd.follow_up_findings) ? rd.follow_up_findings : (Array.isArray(rd.adaptive_follow_up_findings) ? rd.adaptive_follow_up_findings : []);
+  const observations = rd.observations || rd.clinical_observations || {};
+  const images = Array.isArray(rd.image_analysis) ? rd.image_analysis : [];
   const risk = rd.risk_analysis || {};
-  const explainability = rd.explainability || [];
-  const emergency = rd.emergency_evaluation || {};
-  const recommendations = rd.recommendations || {};
-  const qualityWarnings = rd.data_quality_warnings || risk.data_quality_warnings || rd.risk_analysis?.factor_breakdown?.data_quality_warnings || [];
-  const structuredFactors = rd.structured_factors || risk.structured_factors || rd.risk_analysis?.factor_breakdown?.structured_factors || [];
+  const explainability = Array.isArray(rd.explainability) ? rd.explainability : [];
+  const emergency = rd.emergency || rd.emergency_evaluation || {};
+  const recommendations = rd.recommendation || rd.recommendations || {};
+  const handoff = rd.veterinary_handoff || {};
+  const qualityWarnings = Array.isArray(rd.data_quality_warnings)
+    ? rd.data_quality_warnings
+    : (Array.isArray(risk.data_quality_warnings)
+      ? risk.data_quality_warnings
+      : (Array.isArray(rd.risk_analysis?.factor_breakdown?.data_quality_warnings)
+        ? rd.risk_analysis.factor_breakdown.data_quality_warnings
+        : []));
+  const structuredFactors = Array.isArray(rd.structured_factors)
+    ? rd.structured_factors
+    : (Array.isArray(risk.structured_factors)
+      ? risk.structured_factors
+      : (Array.isArray(rd.risk_analysis?.factor_breakdown?.structured_factors)
+        ? rd.risk_analysis.factor_breakdown.structured_factors
+        : []));
 
-  const isEmergency = Boolean(risk.is_emergency || emergency.is_emergency);
+  const isEmergency = Boolean(risk.is_emergency || emergency.is_emergency || (risk.risk_level && String(risk.risk_level).toLowerCase() === 'emergency'));
 
   return (
     <div style={{ backgroundColor: 'var(--color-bg)', minHeight: 'calc(100vh - 140px)', padding: '2rem 0 4rem' }}>
@@ -444,7 +468,7 @@ DISCLAIMER: VetVision AI is an AI-assisted triage and early-warning tool, not a 
                             {s.severity}
                           </span>
                         </td>
-                        <td style={{ padding: '0.75rem 1rem' }}>{s.duration_display || s.duration || 'Not specified'}</td>
+                        <td style={{ padding: '0.75rem 1rem' }}>{formatDuration(s.duration, s.duration_display)}</td>
                         <td style={{ padding: '0.75rem 1rem', color: 'var(--color-text-muted)' }}>{s.notes || '—'}</td>
                       </tr>
                     ))}
@@ -486,7 +510,11 @@ DISCLAIMER: VetVision AI is an AI-assisted triage and early-warning tool, not a 
                         <div style={{ fontWeight: 600, color: 'var(--color-text-main)' }}>{item.question}</div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.2rem' }}>
                           <span style={{ color: 'var(--color-primary)', fontWeight: 600 }}>Answer:</span>
-                          <span>{item.answer}</span>
+                          <span>
+                            {typeof item.answer === 'object' && item.answer !== null
+                              ? item.answer.text || item.answer.value || JSON.stringify(item.answer)
+                              : String(item.answer ?? '—')}
+                          </span>
                           {item.triggered_emergency && (
                             <span style={{ fontSize: '0.7rem', color: 'var(--color-danger)', fontWeight: 700 }}>⚠️ Critical Response</span>
                           )}
@@ -538,7 +566,7 @@ DISCLAIMER: VetVision AI is an AI-assisted triage and early-warning tool, not a 
                 fontSize: '0.85rem',
               }}
             >
-              {images.length === 0 || images[0].status === 'NOT_PROVIDED' ? (
+              {images.length === 0 || images[0]?.status === 'NOT_PROVIDED' ? (
                 <div style={{ color: 'var(--color-text-muted)' }}>
                   No pet photographs were uploaded during this assessment. Visual analysis was omitted.
                   <div style={{ fontSize: '0.8rem', marginTop: '0.35rem', color: '#64748b' }}>
@@ -823,11 +851,11 @@ DISCLAIMER: VetVision AI is an AI-assisted triage and early-warning tool, not a 
                 color: 'var(--color-text-main)',
               }}
             >
-              {`PATIENT: ${handoff.patient || pet.name}
-TRIAGE: ${risk.risk_level} (Score: ${risk.risk_score}/100) | URGENCY: ${emergency.action_urgency}
-PRIMARY CONCERNS: ${handoff.primary_complaint || 'General intake'}
+              {`PATIENT: ${handoff.patient || pet.name || 'Pet'}
+TRIAGE: ${risk.risk_level || handoff.risk_level || 'UNKNOWN'} (Score: ${risk.risk_score != null ? `${risk.risk_score}/100` : 'N/A'}) | URGENCY: ${emergency.action_urgency || emergency.status || 'Standard'}
+PRIMARY CONCERNS: ${handoff.primary_complaint || handoff.primary_reported_concerns || 'General intake'}
 OBSERVATIONS: ${handoff.clinical_observations_summary || 'Normal'}
-RECOMMENDATION: ${recommendations.primary_action || risk.recommendation}`}
+RECOMMENDATION: ${recommendations.primary_action || recommendations.recommended_action || risk.recommendation || handoff.recommended_action || 'Consult attending veterinarian.'}`}
             </div>
           </div>
 

@@ -188,8 +188,12 @@ class AssessmentService:
         """Detach a symptom from an assessment."""
         assessment = AssessmentService._verify_assessment_ownership(assessment_id, user_id)
 
-        entry = AssessmentSymptom.query.filter_by(
-            assessment_id=assessment.id, symptom_id=symptom_id
+        entry = AssessmentSymptom.query.filter(
+            AssessmentSymptom.assessment_id == assessment.id,
+            db.or_(
+                AssessmentSymptom.symptom_id == symptom_id,
+                AssessmentSymptom.id == symptom_id,
+            )
         ).first()
 
         if not entry:

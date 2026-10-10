@@ -7,6 +7,7 @@ import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import { ErrorMessage } from '../components/common/ErrorMessage';
 import { EmptyState } from '../components/common/EmptyState';
 import { TriageBadge } from '../components/common/TriageBadge';
+import { getSpeciesEmoji } from '../utils/petSpecies';
 import { 
   PlusCircle, 
   FolderHeart, 
@@ -36,7 +37,7 @@ export const DashboardPage = () => {
         
         // Fetch pets
         const petsData = await petApi.getPets();
-        const petsList = petsData || [];
+        const petsList = Array.isArray(petsData) ? petsData : (petsData?.data || []);
         setPets(petsList);
 
         // Fetch recent assessments across pets
@@ -44,19 +45,25 @@ export const DashboardPage = () => {
         for (const pet of petsList.slice(0, 5)) {
           try {
             const petAsmts = await petApi.getPetAssessments(pet.id);
-            if (Array.isArray(petAsmts)) {
-              petAsmts.forEach(a => allAssessments.push({ ...a, pet_name: pet.name, pet_species: pet.species }));
-            }
+            const asmtList = Array.isArray(petAsmts) ? petAsmts : (petAsmts?.data || []);
+            asmtList.forEach((a) => {
+              allAssessments.push({ ...a, pet_name: pet.name, pet_species: pet.species });
+            });
           } catch {
             // Ignore single pet failure
           }
         }
 
         // Sort latest first
-        allAssessments.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+        allAssessments.sort((a, b) => {
+          const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
+          const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
+          return dateB - dateA;
+        });
         setAssessments(allAssessments.slice(0, 6));
 
       } catch (err) {
+        console.error('Failed to load dashboard data:', err);
         setError(err.message || 'Failed to load dashboard data.');
       } finally {
         setLoading(false);
@@ -182,7 +189,7 @@ export const DashboardPage = () => {
           </div>
           <div>
             <div style={{ fontSize: '28px', fontWeight: '800', color: 'var(--text-main)', lineHeight: 1.1 }}>
-              {assessments.filter(a => a.status === 'completed').length}
+              {(Array.isArray(assessments) ? assessments : []).filter(a => a.status === 'completed').length}
             </div>
             <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-muted)' }}>
               Completed Clinical Sessions
@@ -203,15 +210,15 @@ export const DashboardPage = () => {
             </p>
           </div>
           <Link to="/pets" className="btn btn-sm btn-outline-primary">
-            View All ({pets.length})
+            View All ({Array.isArray(pets) ? pets.length : 0})
           </Link>
         </div>
 
-        {pets.length === 0 ? (
+        {(!Array.isArray(pets) || pets.length === 0) ? (
           <EmptyState
             icon={FolderHeart}
             title="No pets added yet"
-            description="Add your first dog or cat to begin monitoring symptoms and health indicators."
+            description="Register your pet to begin monitoring symptoms, vital observations, and health indicators."
             actionLabel="+ Register First Pet"
             onAction={() => navigate('/pets')}
           />
@@ -220,13 +227,29 @@ export const DashboardPage = () => {
             {pets.slice(0, 3).map((pet) => (
               <div key={pet.id} className="card card-interactive" onClick={() => navigate(`/pets/${pet.id}`)}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
-                  <div>
-                    <h3 style={{ fontSize: '18px', fontWeight: '700', color: 'var(--text-main)' }}>
-                      {pet.name}
-                    </h3>
-                    <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-                      {pet.species} • {pet.breed || 'Mixed'}
-                    </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div
+                      style={{
+                        width: '38px',
+                        height: '38px',
+                        borderRadius: '10px',
+                        backgroundColor: 'var(--bg-muted)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '20px',
+                      }}
+                    >
+                      {getSpeciesEmoji(pet.species)}
+                    </div>
+                    <div>
+                      <h3 style={{ fontSize: '17px', fontWeight: '700', color: 'var(--text-main)', margin: 0 }}>
+                        {pet.name}
+                      </h3>
+                      <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+                        {pet.species} • {pet.breed || 'Mixed'}
+                      </span>
+                    </div>
                   </div>
                   <span className="badge badge-neutral">
                     {pet.sex || 'Unknown'}
@@ -281,7 +304,7 @@ export const DashboardPage = () => {
           </Link>
         </div>
 
-        {assessments.length === 0 ? (
+        {(!Array.isArray(assessments) || assessments.length === 0) ? (
           <EmptyState
             icon={Activity}
             title="No assessments recorded yet"
@@ -303,7 +326,7 @@ export const DashboardPage = () => {
                 </tr>
               </thead>
               <tbody>
-                {assessments.map((a) => {
+                {(Array.isArray(assessments) ? assessments : []).map((a) => {
                   const dateStr = a.created_at ? new Date(a.created_at).toLocaleDateString() : 'Recent';
                   const symCount = Array.isArray(a.symptoms) ? a.symptoms.length : 0;
                   const isCompleted = a.status === 'completed';

@@ -17,6 +17,7 @@ import TriageBadge from '../components/common/TriageBadge';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import ErrorMessage from '../components/common/ErrorMessage';
 import EmptyState from '../components/common/EmptyState';
+import { getSpeciesEmoji } from '../utils/petSpecies';
 
 export default function ReportsListPage() {
   const [reports, setReports] = useState([]);
@@ -34,37 +35,60 @@ export default function ReportsListPage() {
       setLoading(true);
       setError(null);
 
-      // Fetch pets to get assessments and their reports
-      const petsRes = await petApi.getPets();
-      const petList = petsRes.data || petsRes || [];
+      let reportItems = [];
 
-      const reportAccumulator = [];
+      // Primary strategy: Fetch all user reports directly in one atomic call
+      try {
+        const userReports = await reportApi.getUserReports();
+        const rawList = Array.isArray(userReports) ? userReports : (userReports?.data || []);
+        if (Array.isArray(rawList) && rawList.length > 0) {
+          reportItems = rawList.map((r) => ({
+            id: r.id,
+            assessment_id: r.assessment_id,
+            pet: r.pet || {},
+            created_at: r.generated_at || r.created_at,
+            triage_level:
+              r.summary?.risk_level ||
+              r.report_data?.risk_analysis?.risk_level ||
+              r.report_data?.risk_analysis?.overall_risk_level ||
+              'routine',
+            risk_score:
+              r.summary?.risk_score ??
+              r.report_data?.risk_analysis?.risk_score,
+            symptoms_count:
+              r.symptoms_count ??
+              r.report_data?.symptoms?.length ??
+              r.report_data?.reported_symptoms?.length ??
+              0,
+            is_emergency: Boolean(
+              r.summary?.is_emergency ??
+              r.report_data?.emergency?.is_emergency ??
+              r.report_data?.emergency_evaluation?.is_emergency ??
+              false
+            ),
+          }));
+        }
+      } catch (directErr) {
+        console.warn('Direct user reports fetch unavailable, falling back to assessment inspection:', directErr);
+      }
 
-      // Fetch assessments for each pet
-      await Promise.all(
-        petList.map(async (pet) => {
-          try {
-            const assessRes = await petApi.getPetAssessments(pet.id);
-            const assessments = assessRes.data || assessRes || [];
+      // Secondary fallback strategy: Inspect per-pet assessments
+      if (reportItems.length === 0) {
+        const petsRes = await petApi.getPets();
+        const petList = Array.isArray(petsRes) ? petsRes : (petsRes?.data || []);
 
-            for (const a of assessments) {
-              if (a.report_id) {
-                // If assessment has report_id
-                reportAccumulator.push({
-                  id: a.report_id,
-                  assessment_id: a.id,
-                  pet: pet,
-                  created_at: a.created_at,
-                  triage_level: a.triage_level || a.risk_analysis?.triage_level || 'routine',
-                  risk_score: a.risk_score ?? a.risk_analysis?.risk_score,
-                  symptoms_count: a.symptoms_count || (a.symptoms ? a.symptoms.length : 0),
-                  is_emergency: Boolean(a.is_emergency || a.risk_analysis?.is_emergency),
-                });
-              } else {
-                // Check if reports exist for this assessment
+        const reportAccumulator = [];
+
+        await Promise.all(
+          petList.map(async (pet) => {
+            try {
+              const assessRes = await petApi.getPetAssessments(pet.id);
+              const assessments = Array.isArray(assessRes) ? assessRes : (assessRes?.data || []);
+
+              for (const a of assessments) {
                 try {
                   const repRes = await reportApi.getAssessmentReports(a.id);
-                  const reps = repRes.data || repRes || [];
+                  const reps = Array.isArray(repRes) ? repRes : (repRes?.data || []);
                   for (const r of reps) {
                     reportAccumulator.push({
                       id: r.id,
@@ -81,9 +105,13 @@ export default function ReportsListPage() {
                         r.report_data?.risk_analysis?.risk_score ??
                         a.risk_score,
                       symptoms_count:
-                        r.report_data?.reported_symptoms?.length || a.symptoms_count || 0,
+                        r.symptoms_count ??
+                        r.report_data?.symptoms?.length ??
+                        r.report_data?.reported_symptoms?.length ??
+                        (a.symptoms ? a.symptoms.length : 0),
                       is_emergency: Boolean(
                         r.summary?.is_emergency ??
+                        r.report_data?.emergency?.is_emergency ??
                         r.report_data?.emergency_evaluation?.is_emergency ??
                         a.is_emergency
                       ),
@@ -93,17 +121,18 @@ export default function ReportsListPage() {
                   // Assessment might not have a report yet
                 }
               }
+            } catch {
+              // Assessment fetch error for single pet handled gracefully
             }
-          } catch {
-            // Assessment fetch error for single pet handled gracefully
-          }
-        })
-      );
+          })
+        );
+        reportItems = reportAccumulator;
+      }
 
       // Deduplicate by report id
       const uniqueReportsMap = new Map();
-      reportAccumulator.forEach((r) => {
-        if (!uniqueReportsMap.has(r.id)) {
+      reportItems.forEach((r) => {
+        if (r.id && !uniqueReportsMap.has(r.id)) {
           uniqueReportsMap.set(r.id, r);
         }
       });
@@ -115,23 +144,26 @@ export default function ReportsListPage() {
 
       setReports(sorted);
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to load veterinary reports.');
+      console.error('Failed to load reports:', err);
+      setError(err.message || err.response?.data?.message || 'Failed to load veterinary reports.');
     } finally {
       setLoading(false);
     }
   };
 
   const filteredReports = reports.filter((r) => {
-    const petName = r.pet?.name?.toLowerCase() || '';
-    const breed = r.pet?.breed?.toLowerCase() || '';
+    const petName = (r.pet?.name || '').toLowerCase();
+    const breed = (r.pet?.breed || '').toLowerCase();
+    const reportId = (r.id ? String(r.id) : '').toLowerCase();
+    const query = (searchQuery || '').toLowerCase();
     const matchesSearch =
-      petName.includes(searchQuery.toLowerCase()) ||
-      breed.includes(searchQuery.toLowerCase()) ||
-      r.id.toLowerCase().includes(searchQuery.toLowerCase());
+      petName.includes(query) ||
+      breed.includes(query) ||
+      reportId.includes(query);
 
     const matchesTriage =
       selectedTriage === 'all' ||
-      r.triage_level?.toLowerCase() === selectedTriage.toLowerCase();
+      String(r.triage_level || '').toLowerCase() === selectedTriage.toLowerCase();
 
     return matchesSearch && matchesTriage;
   });
@@ -244,8 +276,10 @@ export default function ReportsListPage() {
             {filteredReports.map((rep) => {
               const petName = rep.pet?.name || 'Pet';
               const species = rep.pet?.species || 'dog';
-              const speciesEmoji = species.toLowerCase() === 'cat' ? '🐱' : '🐶';
-              const dateStr = rep.created_at ? new Date(rep.created_at).toLocaleDateString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : 'Recent';
+              const speciesEmoji = getSpeciesEmoji(species);
+              const dateStr = rep.created_at
+                ? new Date(rep.created_at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+                : 'Recent';
 
               return (
                 <div
@@ -301,7 +335,7 @@ export default function ReportsListPage() {
 
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid var(--color-border)', paddingTop: '1rem' }}>
                     <span style={{ fontSize: '0.75rem', color: 'var(--color-text-light)', fontFamily: 'monospace' }}>
-                      #{rep.id.slice(0, 8)}
+                      #{rep.id ? String(rep.id).slice(0, 8) : '--------'}
                     </span>
                     <Link
                       to={`/reports/${rep.id}`}

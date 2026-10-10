@@ -241,17 +241,17 @@ export const LandingPage = () => {
         </div>
       </section>
 
-      {/* Innovation Callout */}
+      {/* Platform Callout */}
       <section style={{ padding: '60px 0', backgroundColor: 'var(--bg-surface)' }}>
         <div className="container" style={{ textAlign: 'center', maxWidth: '720px' }}>
           <h2 style={{ fontSize: '26px', fontWeight: '800', color: 'var(--text-main)', marginBottom: '14px' }}>
-            Ready for Innovation Day Demonstration
+            Ready to Experience VetVision AI?
           </h2>
           <p style={{ fontSize: '15px', color: 'var(--text-muted)', marginBottom: '28px', lineHeight: 1.6 }}>
             Experience the complete intake journey: from dynamic symptom selection to computer-vision photo inspection, explainable factor attribution, and print-ready veterinary handoff summaries.
           </p>
           <Link to="/register" className="btn btn-primary btn-lg">
-            Create Free Account & Test Live
+            Get Started with a Free Account
             <ChevronRight size={18} />
           </Link>
         </div>

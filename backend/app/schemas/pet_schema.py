@@ -1,5 +1,5 @@
 """Marshmallow validation and serialization schemas for Pet entities."""
-from marshmallow import Schema, fields, validate
+from marshmallow import Schema, fields, validate, pre_load
 from app.utils.validators import (
     validate_name,
     validate_species,
@@ -11,6 +11,21 @@ from app.utils.validators import (
 
 class PetCreateSchema(Schema):
     """Schema for registering a new pet."""
+
+    @pre_load
+    def sanitize_empty_values(self, data, **kwargs):
+        """Sanitize empty strings to None so optional Date/Float fields pass validation."""
+        if not isinstance(data, dict):
+            return data
+        cleaned = {}
+        for k, v in data.items():
+            if isinstance(v, str):
+                trimmed = v.strip()
+                cleaned[k] = trimmed if trimmed else None
+            else:
+                cleaned[k] = v
+        return cleaned
+
     name = fields.String(
         required=True,
         validate=validate_name,
@@ -65,6 +80,20 @@ class PetCreateSchema(Schema):
 
 class PetUpdateSchema(Schema):
     """Schema for updating an existing pet profile."""
+
+    @pre_load
+    def sanitize_empty_values(self, data, **kwargs):
+        """Sanitize empty strings to None so optional Date/Float fields pass validation."""
+        if not isinstance(data, dict):
+            return data
+        cleaned = {}
+        for k, v in data.items():
+            if isinstance(v, str):
+                trimmed = v.strip()
+                cleaned[k] = trimmed if trimmed else None
+            else:
+                cleaned[k] = v
+        return cleaned
     name = fields.String(
         required=False,
         validate=validate_name,

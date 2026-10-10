@@ -48,12 +48,12 @@ export const Footer = () => {
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Activity size={16} color="var(--primary)" />
             <span style={{ fontWeight: '600', color: 'var(--text-main)' }}>VetVision AI</span>
-            <span>— University Innovation Day Healthcare Prototype</span>
+            <span>— Veterinary Health Intelligence Platform</span>
           </div>
 
           <div style={{ display: 'flex', gap: '20px' }}>
-            <span>Built with clean clinical triage standards</span>
-            <span>Steps 1–6 Verified</span>
+            <span>Clinical Triage Standards</span>
+            <span>AI-Assisted Early Warning</span>
           </div>
         </div>
       </div>

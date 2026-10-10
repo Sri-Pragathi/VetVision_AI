@@ -101,7 +101,7 @@ The following four defects represent **immediate showstoppers** that will preven
 
 ---
 
-## 4. Recommended Deployment Architecture (Student Innovation Project)
+## 4. Recommended Deployment Architecture (Production / Cloud Hosting)
 
 To maintain a zero-cost tier while ensuring high reliability, uptime, and demonstration readiness:
 

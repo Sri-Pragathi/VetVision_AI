@@ -686,3 +686,91 @@ def test_ai_payload_includes_follow_up_answers(
     assert "category" in ans
     assert "priority" in ans
     assert "triggered_emergency" in ans
+
+
+# ---------------------------------------------------------------------------
+# 31-32. Frontend Regression Tests: Question & Answer Response Contract
+# ---------------------------------------------------------------------------
+
+def test_next_questions_response_contract_shape(
+    client, registered_user, vomiting_assessment
+):
+    """31. Regression: next-questions returns strict dict with 'questions' list and option fields."""
+    assessment_id = vomiting_assessment["id"]
+    res = client.get(
+        f"/api/v1/assessments/{assessment_id}/next-questions?batch_size=5",
+        headers=registered_user["headers"],
+    )
+    assert res.status_code == 200
+    body = res.get_json()
+    assert body["success"] is True
+    data = body["data"]
+
+    # Must contain top-level questions list
+    assert "questions" in data
+    assert isinstance(data["questions"], list)
+    assert len(data["questions"]) > 0
+
+    # Progress and flags
+    assert "progress" in data
+    assert "answered" in data["progress"]
+    assert "total_estimated" in data["progress"]
+    assert "remaining_estimated" in data["progress"]
+    assert "emergency_flags" in data
+    assert isinstance(data["emergency_flags"], list)
+
+    # Inspect question options structure
+    q = data["questions"][0]
+    assert "id" in q
+    assert "question_text" in q
+    assert "options" in q
+    assert isinstance(q["options"], list)
+    if q["options"]:
+        opt = q["options"][0]
+        assert "id" in opt
+        assert "option_text" in opt
+        assert "option_value" in opt
+        assert "emergency_flag" in opt
+        assert "severity_weight" in opt
+
+
+def test_answer_submission_and_retrieval_contract(
+    client, registered_user, vomiting_assessment
+):
+    """32. Regression: answer submit with selected_option_id and get_answers return structure."""
+    assessment_id = vomiting_assessment["id"]
+    next_res = client.get(
+        f"/api/v1/assessments/{assessment_id}/next-questions",
+        headers=registered_user["headers"],
+    )
+    q = next_res.get_json()["data"]["questions"][0]
+    opt = q["options"][0] if q.get("options") else None
+
+    # Submit valid answer
+    payload = {
+        "question_id": q["id"],
+        "selected_option_id": opt["id"] if opt else None,
+        "answer_text": opt["option_text"] if opt else "yes",
+    }
+    submit_res = client.post(
+        f"/api/v1/assessments/{assessment_id}/answers",
+        headers=registered_user["headers"],
+        json=payload,
+    )
+    assert submit_res.status_code == 201
+
+    # Verify get answers contract
+    ans_res = client.get(
+        f"/api/v1/assessments/{assessment_id}/answers",
+        headers=registered_user["headers"],
+    )
+    assert ans_res.status_code == 200
+    ans_body = ans_res.get_json()
+    assert "answers" in ans_body["data"]
+    assert isinstance(ans_body["data"]["answers"], list)
+    assert len(ans_body["data"]["answers"]) == 1
+    submitted = ans_body["data"]["answers"][0]
+    assert submitted["question_id"] == q["id"]
+    if opt:
+        assert submitted["selected_option_id"] == opt["id"]
+

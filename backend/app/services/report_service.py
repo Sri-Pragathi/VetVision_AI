@@ -5,6 +5,7 @@ from typing import Dict, Any, List, Optional
 from app.extensions import db
 from app.models.health_assessment import HealthAssessment
 from app.models.assessment_report import AssessmentReport
+from app.models.pet import Pet
 from app.services.assessment_service import AssessmentService
 from app.services.risk_analysis_service import RiskAnalysisService
 from app.services.report_html_renderer import ReportHtmlRenderer
@@ -502,6 +503,34 @@ class ReportService:
             .all()
         )
         return [r.to_dict(include_full_data=False) for r in reports]
+
+    @classmethod
+    def get_user_reports(cls, user_id: str) -> List[Dict[str, Any]]:
+        """Retrieve all reports across all pets owned by the authenticated user."""
+        reports = (
+            AssessmentReport.query
+            .join(AssessmentReport.assessment)
+            .join(HealthAssessment.pet)
+            .filter(Pet.owner_id == user_id)
+            .order_by(AssessmentReport.generated_at.desc())
+            .all()
+        )
+        result = []
+        for r in reports:
+            rep_dict = r.to_dict(include_full_data=False)
+            pet = r.assessment.pet if r.assessment else None
+            if pet:
+                rep_dict["pet"] = {
+                    "id": pet.id,
+                    "name": pet.name,
+                    "species": pet.species,
+                    "breed": pet.breed,
+                }
+            rd = r.report_data or {}
+            symptoms = rd.get("symptoms") or rd.get("reported_symptoms") or []
+            rep_dict["symptoms_count"] = len(symptoms)
+            result.append(rep_dict)
+        return result
 
     @classmethod
     def get_report_by_id(cls, report_id: str, user_id: str) -> Dict[str, Any]:

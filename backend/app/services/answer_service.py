@@ -181,6 +181,71 @@ class AnswerService:
         return answer.to_dict(include_question=True)
 
     @staticmethod
+    def update_answer(
+        assessment_id: str,
+        user_id: str,
+        data: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Update an existing answer to a follow-up question, or create it if not present."""
+        assessment = AnswerService._verify_assessment_and_ownership(assessment_id, user_id)
+
+        if assessment.status in (
+            HealthAssessment.STATUS_COMPLETED,
+            HealthAssessment.STATUS_CANCELLED,
+        ):
+            raise ValidationException(
+                f"Cannot update answers to a {assessment.status} assessment."
+            )
+
+        question_id = data["question_id"]
+        question = AnswerService._verify_question_applicable(assessment, question_id)
+
+        existing = AssessmentAnswer.query.filter_by(
+            assessment_id=assessment_id,
+            question_id=question_id,
+        ).first()
+
+        selected_option_id = data.get("selected_option_id")
+        selected_option = None
+        triggered_emergency = False
+
+        if selected_option_id:
+            selected_option = db.session.get(FollowUpQuestionOption, selected_option_id)
+            if not selected_option:
+                raise NotFoundException(
+                    f"Option '{selected_option_id}' not found."
+                )
+            if selected_option.question_id != question_id:
+                raise ValidationException(
+                    "The selected option does not belong to the specified question."
+                )
+            triggered_emergency = selected_option.emergency_flag
+
+        AnswerService._validate_answer_type(question, data, selected_option)
+
+        if existing:
+            existing.selected_option_id = selected_option_id
+            existing.answer_text = data.get("answer_text")
+            existing.numeric_value = data.get("numeric_value")
+            existing.boolean_value = data.get("boolean_value")
+            existing.triggered_emergency = triggered_emergency
+            db.session.commit()
+            return existing.to_dict(include_question=True)
+
+        answer = AssessmentAnswer(
+            assessment_id=assessment_id,
+            question_id=question_id,
+            selected_option_id=selected_option_id,
+            answer_text=data.get("answer_text"),
+            numeric_value=data.get("numeric_value"),
+            boolean_value=data.get("boolean_value"),
+            triggered_emergency=triggered_emergency,
+        )
+        db.session.add(answer)
+        db.session.commit()
+        return answer.to_dict(include_question=True)
+
+    @staticmethod
     def _validate_answer_type(
         question: FollowUpQuestion,
         data: Dict[str, Any],

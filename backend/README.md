@@ -1,7 +1,7 @@
 # VetVision AI — Backend Foundation & Health Assessment Architecture
 
 > **AI-Powered Pet Health Early Warning & Veterinary Assistance System**  
-> University Innovation & Technology Competition Project
+> Clinical Decision Support & Veterinary Health Intelligence Platform
 
 ---
 
@@ -764,7 +764,7 @@ Step 6 implements a clinical-grade, versioned **Veterinary Report & Explainable 
 1. **Pet Owner Review** — transparent explanation of findings, clear risk categories, and non-alarmist guidance.
 2. **Veterinary Consultation / Handoff** — concise clinical brief that an owner can share with attending veterinary staff.
 3. **Frontend Display & Future PDF Export** — semantic HTML rendering engine with print-ready styling and built-in XSS protection.
-4. **Innovation Day Demonstration** — clear explainability breakdown showing *why* risk scores and triage priorities were assigned.
+4. **Clinical Demonstration & Presentation** — clear explainability breakdown showing *why* risk scores and triage priorities were assigned.
 
 ```
 Health Assessment
@@ -937,7 +937,7 @@ Step 8B improves photographic evidence quality assessment, actionable guidance, 
 
 ---
 
-## 18. Step 8C — End-to-End Validation, Security Hardening & Innovation Day Demo Readiness
+## 18. Step 8C — End-to-End Validation, Security Hardening & Demo Readiness
 
 ### Overview
 

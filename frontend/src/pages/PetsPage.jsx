@@ -5,6 +5,7 @@ import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import { ErrorMessage } from '../components/common/ErrorMessage';
 import { EmptyState } from '../components/common/EmptyState';
 import { Modal } from '../components/common/Modal';
+import { DAILY_LIFE_SPECIES, getSpeciesEmoji } from '../utils/petSpecies';
 import { 
   FolderHeart, 
   PlusCircle, 
@@ -31,7 +32,8 @@ export const PetsPage = () => {
   // Form fields
   const [formData, setFormData] = useState({
     name: '',
-    species: 'Canine',
+    species: 'Dog',
+    custom_species: '',
     breed: '',
     sex: 'Male Neutered',
     date_of_birth: '',
@@ -63,7 +65,8 @@ export const PetsPage = () => {
     setEditingPet(null);
     setFormData({
       name: '',
-      species: 'Canine',
+      species: 'Dog',
+      custom_species: '',
       breed: '',
       sex: 'Male Neutered',
       date_of_birth: '',
@@ -78,9 +81,11 @@ export const PetsPage = () => {
 
   const openEditModal = (pet) => {
     setEditingPet(pet);
+    const isStandardSpecies = DAILY_LIFE_SPECIES.some((s) => s.value.toLowerCase() === (pet.species || '').toLowerCase());
     setFormData({
       name: pet.name || '',
-      species: pet.species || 'Canine',
+      species: isStandardSpecies ? pet.species : 'Other',
+      custom_species: isStandardSpecies ? '' : (pet.species || ''),
       breed: pet.breed || '',
       sex: pet.sex || 'Male Neutered',
       date_of_birth: pet.date_of_birth || '',
@@ -98,9 +103,22 @@ export const PetsPage = () => {
     setSaving(true);
     setError(null);
 
+    const finalSpecies =
+      formData.species === 'Other' && formData.custom_species?.trim()
+        ? formData.custom_species.trim()
+        : (formData.species || 'Dog');
+
     const payload = {
-      ...formData,
-      weight: formData.weight ? parseFloat(formData.weight) : null,
+      name: formData.name ? formData.name.trim() : '',
+      species: finalSpecies,
+      breed: formData.breed?.trim() ? formData.breed.trim() : null,
+      sex: formData.sex || null,
+      date_of_birth: formData.date_of_birth && formData.date_of_birth.trim() ? formData.date_of_birth.trim() : null,
+      weight: formData.weight && !isNaN(parseFloat(formData.weight)) ? parseFloat(formData.weight) : null,
+      allergies: formData.allergies?.trim() ? formData.allergies.trim() : null,
+      existing_conditions: formData.existing_conditions?.trim() ? formData.existing_conditions.trim() : null,
+      current_medications: formData.current_medications?.trim() ? formData.current_medications.trim() : null,
+      vaccination_status: formData.vaccination_status?.trim() ? formData.vaccination_status.trim() : null,
     };
 
     try {
@@ -112,7 +130,15 @@ export const PetsPage = () => {
       setIsModalOpen(false);
       fetchPets();
     } catch (err) {
-      setError(err.message || 'Failed to save pet profile.');
+      const errData = err.response?.data;
+      let errMsg = errData?.message || err.message || 'Failed to save pet profile.';
+      if (errData?.errors) {
+        const fieldErrors = Object.entries(errData.errors)
+          .map(([f, msgs]) => `${f}: ${Array.isArray(msgs) ? msgs.join(', ') : msgs}`)
+          .join(' | ');
+        errMsg = `${errMsg} (${fieldErrors})`;
+      }
+      setError(errMsg);
     } finally {
       setSaving(false);
     }
@@ -163,13 +189,29 @@ export const PetsPage = () => {
           {pets.map((pet) => (
             <div key={pet.id} className="card" style={{ display: 'flex', flexDirection: 'column' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '14px' }}>
-                <div>
-                  <h3 style={{ fontSize: '20px', fontWeight: '800', color: 'var(--text-main)' }}>
-                    {pet.name}
-                  </h3>
-                  <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-                    {pet.species} • {pet.breed || 'Mixed Breed'}
-                  </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div
+                    style={{
+                      width: '44px',
+                      height: '44px',
+                      borderRadius: '12px',
+                      backgroundColor: 'var(--bg-muted)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '22px',
+                    }}
+                  >
+                    {getSpeciesEmoji(pet.species)}
+                  </div>
+                  <div>
+                    <h3 style={{ fontSize: '18px', fontWeight: '800', color: 'var(--text-main)', margin: 0 }}>
+                      {pet.name}
+                    </h3>
+                    <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+                      {pet.species} • {pet.breed || 'Mixed Breed'}
+                    </span>
+                  </div>
                 </div>
                 <div style={{ display: 'flex', gap: '4px' }}>
                   <button 
@@ -264,12 +306,29 @@ export const PetsPage = () => {
                 onChange={(e) => setFormData({ ...formData, species: e.target.value })}
                 required
               >
-                <option value="Canine">Canine (Dog)</option>
-                <option value="Feline">Feline (Cat)</option>
-                <option value="Other">Other Species</option>
+                {DAILY_LIFE_SPECIES.map((s) => (
+                  <option key={s.value} value={s.value}>
+                    {s.label}
+                  </option>
+                ))}
               </select>
             </div>
           </div>
+
+          {formData.species === 'Other' && (
+            <div className="form-group" style={{ marginBottom: '16px' }}>
+              <label className="form-label" htmlFor="pet-custom-species">Specify Pet Species *</label>
+              <input
+                id="pet-custom-species"
+                type="text"
+                className="form-input"
+                placeholder="e.g. Chinchilla, Duck, Hedgehog, Pigeon"
+                value={formData.custom_species || ''}
+                onChange={(e) => setFormData({ ...formData, custom_species: e.target.value })}
+                required
+              />
+            </div>
+          )}
 
           <div className="grid-2">
             <div className="form-group">
@@ -278,7 +337,7 @@ export const PetsPage = () => {
                 id="pet-breed"
                 type="text"
                 className="form-input"
-                placeholder="e.g. German Shepherd, Domestic Shorthair"
+                placeholder="e.g. Golden Retriever, Holland Lop, Cockatiel"
                 value={formData.breed}
                 onChange={(e) => setFormData({ ...formData, breed: e.target.value })}
               />
@@ -292,10 +351,11 @@ export const PetsPage = () => {
                 value={formData.sex}
                 onChange={(e) => setFormData({ ...formData, sex: e.target.value })}
               >
-                <option value="Male Neutered">Male Neutered</option>
-                <option value="Male Intact">Male Intact</option>
-                <option value="Female Spayed">Female Spayed</option>
-                <option value="Female Intact">Female Intact</option>
+                <option value="Male Neutered">Male (Neutered)</option>
+                <option value="Male Intact">Male (Intact)</option>
+                <option value="Female Spayed">Female (Spayed)</option>
+                <option value="Female Intact">Female (Intact)</option>
+                <option value="Unknown">Unknown / Unspecified</option>
               </select>
             </div>
           </div>

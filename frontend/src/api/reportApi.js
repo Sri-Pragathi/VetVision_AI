@@ -11,6 +11,11 @@ export const reportApi = {
     return res.data;
   },
 
+  getUserReports: async () => {
+    const res = await apiClient.get('/reports');
+    return res.data;
+  },
+
   getReport: async (reportId) => {
     const res = await apiClient.get(`/reports/${reportId}`);
     return res.data;

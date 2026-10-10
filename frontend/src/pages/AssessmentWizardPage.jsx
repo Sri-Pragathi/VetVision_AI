@@ -32,6 +32,7 @@ import TriageBadge from '../components/common/TriageBadge';
 import EmergencyBanner from '../components/common/EmergencyBanner';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import ErrorMessage from '../components/common/ErrorMessage';
+import { getSpeciesEmoji } from '../utils/petSpecies';
 
 const STEPS = [
   { id: 1, title: 'Select Pet', icon: '🐾' },
@@ -42,6 +43,283 @@ const STEPS = [
   { id: 6, title: 'Review & Verify', icon: '🔍' },
   { id: 7, title: 'AI Risk Result', icon: '⚡' },
 ];
+
+function NumericQuestionInput({ question, initialValue, onSubmit, isAnswered }) {
+  const [val, setVal] = useState(initialValue != null ? String(initialValue) : '');
+  const [showKeypad, setShowKeypad] = useState(true);
+
+  useEffect(() => {
+    if (initialValue != null) {
+      setVal(String(initialValue));
+    }
+  }, [initialValue]);
+
+  const handleQuickSelect = (n) => {
+    setVal(String(n));
+    onSubmit(parseFloat(n));
+  };
+
+  const handleKeyClick = (key) => {
+    if (key === 'clear') {
+      setVal('');
+    } else if (key === 'backspace') {
+      setVal((prev) => prev.slice(0, -1));
+    } else if (key === '.') {
+      setVal((prev) => (prev.includes('.') ? prev : (prev ? prev + '.' : '0.')));
+    } else {
+      setVal((prev) => (prev === '0' ? String(key) : prev + key));
+    }
+  };
+
+  const handleStep = (delta) => {
+    const current = parseFloat(val) || 0;
+    const nextVal = Math.max(0, current + delta);
+    setVal(String(nextVal));
+  };
+
+  const handleConfirm = () => {
+    if (val === '' || isNaN(parseFloat(val))) return;
+    onSubmit(parseFloat(val));
+  };
+
+  return (
+    <div
+      style={{
+        backgroundColor: '#f8fafc',
+        borderRadius: 'var(--radius-md)',
+        border: '1px solid var(--color-border)',
+        padding: '1.25rem',
+        marginTop: '0.75rem',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+        <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--color-primary)' }}>
+          Clinical Numerical Entry / Keypad
+        </div>
+        <button
+          type="button"
+          onClick={() => setShowKeypad(!showKeypad)}
+          style={{
+            background: 'none',
+            border: 'none',
+            color: 'var(--color-primary)',
+            fontSize: '0.75rem',
+            fontWeight: 600,
+            cursor: 'pointer',
+            padding: 0,
+            textDecoration: 'underline',
+          }}
+        >
+          {showKeypad ? 'Hide Keypad' : 'Show Keypad'}
+        </button>
+      </div>
+
+      {/* Quick Select Buttons */}
+      <div style={{ marginBottom: '1rem' }}>
+        <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '0.4rem', fontWeight: 600 }}>
+          Quick Common Values:
+        </div>
+        <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+          {[0, 1, 2, 3, 4, 5, 6, 8, 10].map((num) => (
+            <button
+              key={num}
+              type="button"
+              onClick={() => handleQuickSelect(num)}
+              className="btn btn-sm"
+              style={{
+                padding: '0.35rem 0.75rem',
+                borderRadius: 'var(--radius-full)',
+                backgroundColor: val === String(num) ? 'var(--color-primary)' : 'white',
+                color: val === String(num) ? 'white' : 'var(--color-text-main)',
+                border: '1px solid var(--color-border)',
+                fontSize: '0.825rem',
+                fontWeight: 700,
+              }}
+            >
+              {num}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Input Field & Stepper Controls */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', backgroundColor: 'white', overflow: 'hidden' }}>
+          <button
+            type="button"
+            onClick={() => handleStep(-1)}
+            style={{
+              width: '40px',
+              height: '42px',
+              border: 'none',
+              background: '#f1f5f9',
+              fontSize: '1.2rem',
+              fontWeight: 800,
+              cursor: 'pointer',
+              color: 'var(--color-text-main)',
+            }}
+            title="Decrease"
+          >
+            -
+          </button>
+          <input
+            type="number"
+            step="any"
+            value={val}
+            onChange={(e) => setVal(e.target.value)}
+            placeholder="0"
+            style={{
+              width: '90px',
+              height: '42px',
+              border: 'none',
+              textAlign: 'center',
+              fontSize: '1.15rem',
+              fontWeight: 800,
+              outline: 'none',
+              color: 'var(--color-primary)',
+            }}
+          />
+          <button
+            type="button"
+            onClick={() => handleStep(1)}
+            style={{
+              width: '40px',
+              height: '42px',
+              border: 'none',
+              background: '#f1f5f9',
+              fontSize: '1.2rem',
+              fontWeight: 800,
+              cursor: 'pointer',
+              color: 'var(--color-text-main)',
+            }}
+            title="Increase"
+          >
+            +
+          </button>
+        </div>
+
+        <button
+          type="button"
+          onClick={handleConfirm}
+          disabled={val === '' || isNaN(parseFloat(val))}
+          className="btn btn-primary"
+          style={{
+            height: '42px',
+            padding: '0 1.25rem',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.4rem',
+            fontWeight: 700,
+            fontSize: '0.9rem',
+          }}
+        >
+          <Check size={16} /> Confirm Answer {val !== '' ? `(${val})` : ''}
+        </button>
+
+        {isAnswered && (
+          <span style={{ fontSize: '0.8rem', color: 'var(--color-success)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+            ✓ Recorded
+          </span>
+        )}
+      </div>
+
+      {/* On-screen Keypad */}
+      {showKeypad && (
+        <div style={{ maxWidth: '280px', backgroundColor: 'white', padding: '0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
+          <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', marginBottom: '0.5rem', fontWeight: 600 }}>
+            Numeric Touch Keypad:
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.4rem' }}>
+            {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((d) => (
+              <button
+                key={d}
+                type="button"
+                onClick={() => handleKeyClick(d)}
+                style={{
+                  height: '42px',
+                  backgroundColor: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: 'var(--radius-sm)',
+                  fontSize: '1.1rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  color: 'var(--color-text-main)',
+                }}
+              >
+                {d}
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={() => handleKeyClick('.')}
+              style={{
+                height: '42px',
+                backgroundColor: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                borderRadius: 'var(--radius-sm)',
+                fontSize: '1.2rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+              }}
+            >
+              .
+            </button>
+            <button
+              type="button"
+              onClick={() => handleKeyClick(0)}
+              style={{
+                height: '42px',
+                backgroundColor: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                borderRadius: 'var(--radius-sm)',
+                fontSize: '1.1rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+              }}
+            >
+              0
+            </button>
+            <button
+              type="button"
+              onClick={() => handleKeyClick('backspace')}
+              style={{
+                height: '42px',
+                backgroundColor: '#fee2e2',
+                border: '1px solid #fecaca',
+                borderRadius: 'var(--radius-sm)',
+                fontSize: '1rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                color: 'var(--color-danger)',
+              }}
+              title="Backspace"
+            >
+              ⌫
+            </button>
+          </div>
+          <button
+            type="button"
+            onClick={() => handleKeyClick('clear')}
+            style={{
+              width: '100%',
+              marginTop: '0.4rem',
+              padding: '0.35rem',
+              background: '#f1f5f9',
+              border: 'none',
+              borderRadius: 'var(--radius-sm)',
+              fontSize: '0.75rem',
+              color: 'var(--color-text-muted)',
+              cursor: 'pointer',
+              fontWeight: 600,
+            }}
+          >
+            Clear
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function AssessmentWizardPage() {
   const [searchParams] = useSearchParams();
@@ -79,6 +357,7 @@ export default function AssessmentWizardPage() {
   const [answers, setAnswers] = useState({});
   const [answeredQuestions, setAnsweredQuestions] = useState([]);
   const [questionsLoading, setQuestionsLoading] = useState(false);
+  const [questionsError, setQuestionsError] = useState(null);
 
   // Step 4: Observations
   const [observations, setObservations] = useState({
@@ -104,6 +383,7 @@ export default function AssessmentWizardPage() {
   // Step 7: Risk Analysis Results
   const [riskResult, setRiskResult] = useState(null);
   const [generatingReport, setGeneratingReport] = useState(false);
+  const [reportError, setReportError] = useState(null);
 
   // Initial Load: Fetch Pets & Catalog
   useEffect(() => {
@@ -208,66 +488,164 @@ export default function AssessmentWizardPage() {
       };
 
       const res = await assessmentApi.addSymptom(assessmentId, payload);
-      const added = res.data || res;
+      const added = res?.data || res;
 
-      setAssessmentSymptoms((prev) => [
-        ...prev,
-        {
+      setAssessmentSymptoms((prev) => {
+        const list = Array.isArray(prev) ? [...prev] : [];
+        const symptomId = activeSymptomModal.id;
+        const existingIdx = list.findIndex(
+          (s) => s.id === added.id || s.symptom_id === symptomId || s.symptom?.id === symptomId
+        );
+        const item = {
           ...added,
+          symptom_id: symptomId,
           symptom: activeSymptomModal,
-        },
-      ]);
+          severity: symptomForm.severity,
+          duration_value: parseInt(symptomForm.duration_value, 10) || 1,
+          duration_unit: symptomForm.duration_unit,
+        };
+        if (existingIdx >= 0) {
+          list[existingIdx] = item;
+        } else {
+          list.push(item);
+        }
+        return list;
+      });
 
       setActiveSymptomModal(null);
       setSymptomForm({ severity: 'moderate', duration_value: 1, duration_unit: 'days', notes: '' });
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to add symptom.');
+      setError(err.response?.data?.message || err.message || 'Failed to add symptom.');
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handleRemoveSymptom = async (symptomAssId) => {
+  const handleRemoveSymptom = async (symptomAssId, catalogSymptomId) => {
     try {
-      await assessmentApi.removeSymptom(assessmentId, symptomAssId);
-      setAssessmentSymptoms((prev) => prev.filter((s) => s.id !== symptomAssId));
+      const idToDelete = catalogSymptomId || symptomAssId;
+      await assessmentApi.removeSymptom(assessmentId, idToDelete);
+      setAssessmentSymptoms((prev) =>
+        prev.filter((s) => s.id !== symptomAssId && s.symptom_id !== idToDelete && s.symptom?.id !== idToDelete)
+      );
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to remove symptom.');
     }
   };
 
-  // Step 3: Fetch Questions
-  const fetchDynamicQuestions = async () => {
+  // Step 3: Fetch Questions (cumulative so answered questions remain visible)
+  const fetchDynamicQuestions = async (showLoading = true) => {
     if (!assessmentId) return;
     try {
-      setQuestionsLoading(true);
+      if (showLoading) {
+        setQuestionsLoading(true);
+      }
+      setQuestionsError(null);
       const res = await questionApi.getNextQuestions(assessmentId, 6);
-      const qList = res.data || res || [];
-      setQuestions(qList);
+      let qList = [];
+      if (Array.isArray(res)) {
+        qList = res;
+      } else if (res && Array.isArray(res.questions)) {
+        qList = res.questions;
+      } else if (res && res.data && Array.isArray(res.data.questions)) {
+        qList = res.data.questions;
+      } else if (res && Array.isArray(res.data)) {
+        qList = res.data;
+      }
 
-      // Also get answered questions
-      const ansRes = await questionApi.getAnswers(assessmentId).catch(() => ({ data: [] }));
-      setAnsweredQuestions(ansRes.data || ansRes || []);
+      // Merge questions cumulatively so answered questions do not vanish
+      setQuestions((prevQuestions) => {
+        const questionMap = new Map();
+        if (Array.isArray(prevQuestions)) {
+          for (const q of prevQuestions) {
+            if (q && q.id) questionMap.set(q.id, q);
+          }
+        }
+        if (Array.isArray(qList)) {
+          for (const q of qList) {
+            if (q && q.id) questionMap.set(q.id, q);
+          }
+        }
+        return Array.from(questionMap.values());
+      });
+
+      // Also get answered questions to maintain answers state
+      const ansRes = await questionApi.getAnswers(assessmentId).catch(() => ({ answers: [] }));
+      let ansList = [];
+      if (Array.isArray(ansRes)) {
+        ansList = ansRes;
+      } else if (ansRes && Array.isArray(ansRes.answers)) {
+        ansList = ansRes.answers;
+      } else if (ansRes && ansRes.data && Array.isArray(ansRes.data.answers)) {
+        ansList = ansRes.data.answers;
+      } else if (ansRes && Array.isArray(ansRes.data)) {
+        ansList = ansRes.data;
+      }
+      setAnsweredQuestions(ansList);
+
+      // Synchronize answers map from server answers
+      if (ansList.length > 0) {
+        setAnswers((prev) => {
+          const updated = { ...prev };
+          for (const ans of ansList) {
+            if (ans && ans.question_id) {
+              updated[ans.question_id] = {
+                optionId: ans.selected_option_id || ans.selected_option?.id || null,
+                answerValue: ans.answer_text,
+                numericValue: ans.numeric_value,
+                booleanValue: ans.boolean_value,
+              };
+            }
+          }
+          return updated;
+        });
+      }
     } catch (err) {
       console.error('Failed to load questions:', err);
+      setQuestionsError(err.message || err.response?.data?.message || 'Failed to retrieve clinical follow-up questions.');
     } finally {
-      setQuestionsLoading(false);
+      if (showLoading) {
+        setQuestionsLoading(false);
+      }
     }
   };
 
-  const handleAnswerSubmit = async (questionId, optionId, answerValue = null) => {
+  const handleAnswerSubmit = async (questionId, optionId, answerValue = null, numericValue = null, booleanValue = null) => {
     try {
+      // Optimistic local state update so the clicked option lights up immediately
+      setAnswers((prev) => ({
+        ...prev,
+        [questionId]: { optionId, answerValue, numericValue, booleanValue },
+      }));
+
       const payload = {
         question_id: questionId,
-        option_id: optionId || null,
-        answer_value: answerValue || null,
+        selected_option_id: optionId || null,
+        answer_text: typeof answerValue === 'string' ? answerValue : (answerValue ? String(answerValue) : null),
+        numeric_value: typeof numericValue === 'number' ? numericValue : null,
+        boolean_value: typeof booleanValue === 'boolean' ? booleanValue : null,
       };
-      await questionApi.submitAnswer(assessmentId, payload);
-      setAnswers((prev) => ({ ...prev, [questionId]: { optionId, answerValue } }));
-      // Refresh questions list for adaptive changes
-      await fetchDynamicQuestions();
+
+      const res = await questionApi.submitAnswer(assessmentId, payload);
+      const savedAnswer = res?.data || res;
+
+      // Update answeredQuestions array
+      setAnsweredQuestions((prev) => {
+        const list = Array.isArray(prev) ? [...prev] : [];
+        const existingIdx = list.findIndex((a) => a?.question_id === questionId);
+        if (existingIdx >= 0) {
+          list[existingIdx] = savedAnswer;
+        } else {
+          list.push(savedAnswer);
+        }
+        return list;
+      });
+
+      // Refresh dynamic questions silently in background to fetch subsequent questions
+      await fetchDynamicQuestions(false);
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to record answer.');
+      console.error('Failed to record answer:', err);
+      setError(err.response?.data?.message || err.message || 'Failed to record answer.');
     }
   };
 
@@ -276,10 +654,20 @@ export default function AssessmentWizardPage() {
     try {
       setSubmitting(true);
       setError(null);
-      await assessmentApi.upsertObservations(assessmentId, observations);
+      const payload = {
+        appetite: observations.appetite === 'absent' ? 'none' : (observations.appetite || 'normal'),
+        water_intake: observations.water_intake || 'normal',
+        activity_level: observations.activity_level || 'normal',
+        breathing_change: observations.breathing_change || 'normal',
+        pain_observed: observations.pain_observed ? 'mild_vocalizing' : 'none',
+      };
+      await assessmentApi.upsertObservations(assessmentId, payload);
+      if (observations.general_notes && observations.general_notes.trim()) {
+        await assessmentApi.addNote(assessmentId, observations.general_notes.trim()).catch(() => {});
+      }
       setCurrentStep(5);
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to save clinical observations.');
+      setError(err.response?.data?.message || err.message || 'Failed to save clinical observations.');
     } finally {
       setSubmitting(false);
     }
@@ -367,25 +755,62 @@ export default function AssessmentWizardPage() {
   const handleGenerateReport = async () => {
     try {
       setGeneratingReport(true);
+      setReportError(null);
       const res = await reportApi.generateReport(assessmentId);
       const report = res.data || res;
       navigate(`/reports/${report.id}`);
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to generate report.');
+      const msg = err.response?.data?.message || err.message || 'Failed to generate clinical health report.';
+      setReportError(msg);
       setGeneratingReport(false);
     }
   };
 
+  const normalizeCategory = (cat) => {
+    if (!cat) return '';
+    const clean = String(cat).toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (clean.includes('skin') || clean.includes('coat')) return 'skin_coat';
+    if (clean.includes('eye') || clean.includes('ear')) return 'eyes_ears';
+    if (clean.includes('digest')) return 'digestive';
+    if (clean.includes('respir')) return 'respiratory';
+    if (clean.includes('musculo') || clean.includes('skelet')) return 'musculoskeletal';
+    if (clean.includes('neuro')) return 'neurological';
+    if (clean.includes('urin')) return 'urinary';
+    if (clean.includes('behav')) return 'behavioural';
+    if (clean.includes('gen')) return 'general';
+    return clean;
+  };
+
+  const CATEGORY_TABS = [
+    { id: 'all', label: 'All Symptoms' },
+    { id: 'digestive', label: 'Digestive' },
+    { id: 'respiratory', label: 'Respiratory' },
+    { id: 'skin_coat', label: 'Skin & Coat' },
+    { id: 'musculoskeletal', label: 'Musculoskeletal' },
+    { id: 'general', label: 'General' },
+    { id: 'neurological', label: 'Neurological' },
+    { id: 'urinary', label: 'Urinary' },
+    { id: 'eyes_ears', label: 'Eyes & Ears' },
+    { id: 'behavioural', label: 'Behavioural' },
+  ];
+
   // Filter symptoms
-  const filteredSymptoms = symptomCatalog.filter((sym) => {
-    const matchesCat = selectedCategory === 'all' || sym.category === selectedCategory;
+  const filteredSymptoms = (Array.isArray(symptomCatalog) ? symptomCatalog : []).filter((sym) => {
+    if (!sym || !sym.name) return false;
+    const symCat = normalizeCategory(sym.category);
+    const matchesCat =
+      selectedCategory === 'all' ||
+      symCat === selectedCategory ||
+      (sym.category && sym.category.toLowerCase() === selectedCategory.toLowerCase());
+
+    const query = (symptomSearch || '').trim().toLowerCase();
     const matchesSearch =
-      sym.name.toLowerCase().includes(symptomSearch.toLowerCase()) ||
-      (sym.description && sym.description.toLowerCase().includes(symptomSearch.toLowerCase()));
+      !query ||
+      sym.name.toLowerCase().includes(query) ||
+      (sym.description && sym.description.toLowerCase().includes(query));
+
     return matchesCat && matchesSearch;
   });
-
-  const categories = ['all', 'digestive', 'respiratory', 'skin_coat', 'musculoskeletal', 'general', 'neurological', 'urinary', 'eyes_ears'];
 
   if (loading) {
     return (
@@ -423,7 +848,7 @@ export default function AssessmentWizardPage() {
                 }}
               >
                 <span style={{ fontSize: '1.2rem' }}>
-                  {selectedPet.species === 'cat' ? '🐱' : '🐶'}
+                  {getSpeciesEmoji(selectedPet.species)}
                 </span>
                 <div>
                   <div style={{ fontWeight: 700, fontSize: '0.85rem', lineHeight: 1 }}>{selectedPet.name}</div>
@@ -561,7 +986,7 @@ export default function AssessmentWizardPage() {
                           boxShadow: 'var(--shadow-sm)',
                         }}
                       >
-                        {pet.species === 'cat' ? '🐱' : '🐶'}
+                        {getSpeciesEmoji(pet.species)}
                       </div>
                       <div style={{ flex: 1 }}>
                         <div style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--color-text-main)' }}>
@@ -666,7 +1091,7 @@ export default function AssessmentWizardPage() {
                         ({as.duration_value} {as.duration_unit})
                       </span>
                       <button
-                        onClick={() => handleRemoveSymptom(as.id)}
+                        onClick={() => handleRemoveSymptom(as.id, as.symptom_id || as.symptom?.id)}
                         style={{
                           background: 'none',
                           border: 'none',
@@ -710,21 +1135,23 @@ export default function AssessmentWizardPage() {
 
               {/* Category Pills */}
               <div style={{ display: 'flex', gap: '0.5rem', overflowX: 'auto', paddingBottom: '0.25rem' }}>
-                {categories.map((cat) => (
+                {CATEGORY_TABS.map((cat) => (
                   <button
-                    key={cat}
-                    onClick={() => setSelectedCategory(cat)}
+                    key={cat.id}
+                    type="button"
+                    onClick={() => setSelectedCategory(cat.id)}
                     className="btn btn-sm"
                     style={{
                       borderRadius: 'var(--radius-full)',
-                      backgroundColor: selectedCategory === cat ? 'var(--color-primary)' : 'var(--color-surface)',
-                      color: selectedCategory === cat ? 'white' : 'var(--color-text-muted)',
+                      backgroundColor: selectedCategory === cat.id ? 'var(--color-primary)' : 'var(--color-surface)',
+                      color: selectedCategory === cat.id ? 'white' : 'var(--color-text-muted)',
                       border: '1px solid var(--color-border)',
-                      textTransform: 'capitalize',
                       fontSize: '0.8rem',
+                      fontWeight: selectedCategory === cat.id ? 700 : 500,
+                      whiteSpace: 'nowrap',
                     }}
                   >
-                    {cat.replace('_', ' ')}
+                    {cat.label}
                   </button>
                 ))}
               </div>
@@ -741,55 +1168,85 @@ export default function AssessmentWizardPage() {
                 padding: '0.25rem',
               }}
             >
-              {filteredSymptoms.map((sym) => {
-                const isAlreadyAdded = assessmentSymptoms.some((s) => s.symptom_id === sym.id);
-                return (
-                  <div
-                    key={sym.id}
+              {filteredSymptoms.length === 0 ? (
+                <div
+                  style={{
+                    gridColumn: '1 / -1',
+                    textAlign: 'center',
+                    padding: '2.5rem 1rem',
+                    backgroundColor: 'white',
+                    borderRadius: 'var(--radius-md)',
+                    border: '1px dashed var(--color-border)',
+                  }}
+                >
+                  <Info size={28} color="var(--color-text-light)" style={{ marginBottom: '0.5rem' }} />
+                  <p style={{ margin: '0 0 0.75rem 0', fontWeight: 600, color: 'var(--color-text-main)' }}>
+                    No symptoms found matching your selection.
+                  </p>
+                  <button
+                    type="button"
                     onClick={() => {
-                      if (!isAlreadyAdded) setActiveSymptomModal(sym);
+                      setSelectedCategory('all');
+                      setSymptomSearch('');
                     }}
-                    style={{
-                      padding: '0.85rem 1rem',
-                      borderRadius: 'var(--radius-md)',
-                      border: isAlreadyAdded
-                        ? '1px solid var(--color-success)'
-                        : '1px solid var(--color-border)',
-                      backgroundColor: isAlreadyAdded
-                        ? 'rgba(16, 185, 129, 0.05)'
-                        : 'var(--color-surface)',
-                      cursor: isAlreadyAdded ? 'default' : 'pointer',
-                      transition: 'all 0.15s ease',
-                      opacity: isAlreadyAdded ? 0.6 : 1,
-                    }}
+                    className="btn btn-outline btn-sm"
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <div style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--color-text-main)' }}>
-                        {sym.name}
+                    Show All Symptoms
+                  </button>
+                </div>
+              ) : (
+                filteredSymptoms.map((sym) => {
+                  const isAlreadyAdded = assessmentSymptoms.some(
+                    (s) => s?.symptom_id === sym?.id || s?.symptom?.id === sym?.id
+                  );
+                  return (
+                    <div
+                      key={sym.id}
+                      onClick={() => {
+                        if (!isAlreadyAdded) setActiveSymptomModal(sym);
+                      }}
+                      style={{
+                        padding: '0.85rem 1rem',
+                        borderRadius: 'var(--radius-md)',
+                        border: isAlreadyAdded
+                          ? '1px solid var(--color-success)'
+                          : '1px solid var(--color-border)',
+                        backgroundColor: isAlreadyAdded
+                          ? 'rgba(16, 185, 129, 0.05)'
+                          : 'var(--color-surface)',
+                        cursor: isAlreadyAdded ? 'default' : 'pointer',
+                        transition: 'all 0.15s ease',
+                        opacity: isAlreadyAdded ? 0.6 : 1,
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--color-text-main)' }}>
+                          {sym.name}
+                        </div>
+                        {isAlreadyAdded ? (
+                          <Check size={16} color="var(--color-success)" />
+                        ) : (
+                          <Plus size={16} color="var(--color-primary)" />
+                        )}
                       </div>
-                      {isAlreadyAdded ? (
-                        <Check size={16} color="var(--color-success)" />
-                      ) : (
-                        <Plus size={16} color="var(--color-primary)" />
+                      {sym.description && (
+                        <div
+                          style={{
+                            fontSize: '0.75rem',
+                            color: 'var(--color-text-muted)',
+                            marginTop: '0.25rem',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {sym.description}
+                        </div>
                       )}
                     </div>
-                    {sym.description && (
-                      <div
-                        style={{
-                          fontSize: '0.75rem',
-                          color: 'var(--color-text-muted)',
-                          marginTop: '0.25rem',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
-                        {sym.description}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+                  );
+                })
+              )}
             </div>
 
             {/* Step Navigation */}
@@ -799,9 +1256,9 @@ export default function AssessmentWizardPage() {
               </button>
               <button
                 disabled={assessmentSymptoms.length === 0}
-                onClick={() => {
-                  fetchDynamicQuestions();
+                onClick={async () => {
                   setCurrentStep(3);
+                  await fetchDynamicQuestions(true);
                 }}
                 className="btn btn-primary"
                 style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}
@@ -955,28 +1412,52 @@ export default function AssessmentWizardPage() {
 
             {questionsLoading ? (
               <LoadingSpinner message="Evaluating adaptive clinical decision tree..." />
-            ) : questions.length === 0 ? (
+            ) : questionsError ? (
+              <div
+                style={{
+                  padding: '1.5rem',
+                  backgroundColor: 'rgba(239, 68, 68, 0.05)',
+                  borderRadius: 'var(--radius-md)',
+                  border: '1px solid rgba(239, 68, 68, 0.25)',
+                  textAlign: 'center',
+                }}
+              >
+                <ErrorMessage message={questionsError} onRetry={fetchDynamicQuestions} />
+              </div>
+            ) : !Array.isArray(questions) || questions.length === 0 ? (
               <div
                 style={{
                   textAlign: 'center',
-                  padding: '3rem 1rem',
-                  backgroundColor: 'var(--color-surface)',
-                  borderRadius: 'var(--radius-md)',
+                  padding: '3rem 1.5rem',
+                  backgroundColor: 'white',
+                  borderRadius: 'var(--radius-lg)',
+                  border: '1px solid var(--color-border)',
+                  boxShadow: 'var(--shadow-sm)',
                 }}
               >
-                <CheckCircle2 size={36} color="var(--color-success)" style={{ marginBottom: '0.75rem' }} />
-                <h3 style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '0.25rem' }}>
+                <CheckCircle2 size={40} color="var(--color-success)" style={{ marginBottom: '0.75rem' }} />
+                <h3 style={{ fontSize: '1.15rem', fontWeight: 700, marginBottom: '0.35rem' }}>
                   All Key Clinical Questions Completed!
                 </h3>
-                <p style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', maxWidth: '420px', margin: '0 auto 1.5rem' }}>
-                  No additional follow-ups required based on the reported symptoms. Proceed to physical observations.
+                <p style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', maxWidth: '440px', margin: '0 auto 1.5rem', lineHeight: 1.5 }}>
+                  No additional follow-ups required based on the reported symptoms. You may proceed to physical observations.
                 </p>
+                <button
+                  type="button"
+                  onClick={() => setCurrentStep(4)}
+                  className="btn btn-primary"
+                  style={{ display: 'inline-flex', gap: '0.4rem', alignItems: 'center' }}
+                >
+                  Proceed to Observations <ArrowRight size={16} />
+                </button>
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
                 {questions.map((q, idx) => {
-                  const currentAnswer = answers[q.id];
-                  const hasAnswered = Boolean(currentAnswer) || answeredQuestions.some((a) => a.question_id === q.id);
+                  const currentAnswer = answers[q?.id];
+                  const hasAnswered =
+                    Boolean(currentAnswer) ||
+                    (Array.isArray(answeredQuestions) && answeredQuestions.some((a) => a?.question_id === q?.id));
 
                   return (
                     <div
@@ -1020,16 +1501,37 @@ export default function AssessmentWizardPage() {
                         )}
                       </div>
 
-                      {/* Options */}
-                      {q.options && q.options.length > 0 ? (
+                      {/* Options / Number Pad / Fallbacks */}
+                      {q.question_type === 'number' || q.question_type === 'numerical' || (!q.options?.length && /how many|count|times|number|temperature|episodes/i.test(q.question_text || '')) ? (
+                        <NumericQuestionInput
+                          question={q}
+                          initialValue={
+                            currentAnswer?.numericValue ??
+                            (Array.isArray(answeredQuestions)
+                              ? answeredQuestions.find((a) => a?.question_id === q?.id)?.numeric_value
+                              : null)
+                          }
+                          onSubmit={(num) => handleAnswerSubmit(q.id, null, String(num), num, null)}
+                          isAnswered={hasAnswered}
+                        />
+                      ) : q.options && q.options.length > 0 ? (
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.6rem' }}>
                           {q.options.map((opt) => {
-                            const isOptSelected = currentAnswer?.optionId === opt.id;
+                            const isOptSelected =
+                              currentAnswer?.optionId === opt?.id ||
+                              (Array.isArray(answeredQuestions) &&
+                                 answeredQuestions.some((a) => a?.selected_option_id === opt?.id || a?.selected_option?.id === opt?.id));
+                            const optLabel = opt.option_text || opt.label || opt.text || opt.option_value || 'Option';
+                            const isHighRisk =
+                              opt.emergency_flag === true ||
+                              (opt.severity_weight != null && opt.severity_weight >= 0.7) ||
+                              (opt.risk_weight != null && opt.risk_weight > 2);
+
                             return (
                               <button
                                 key={opt.id}
                                 type="button"
-                                onClick={() => handleAnswerSubmit(q.id, opt.id, opt.label)}
+                                onClick={() => handleAnswerSubmit(q.id, opt.id, optLabel)}
                                 className="btn btn-sm"
                                 style={{
                                   textAlign: 'left',
@@ -1046,8 +1548,8 @@ export default function AssessmentWizardPage() {
                                   justifyContent: 'space-between',
                                 }}
                               >
-                                <span>{opt.label || opt.text}</span>
-                                {opt.risk_weight > 2 && (
+                                <span>{optLabel}</span>
+                                {isHighRisk && (
                                   <span style={{ fontSize: '0.65rem', color: isOptSelected ? '#fecaca' : '#dc2626' }}>
                                     ⚠️ High Risk
                                   </span>
@@ -1063,7 +1565,15 @@ export default function AssessmentWizardPage() {
                             <button
                               key={val}
                               type="button"
-                              onClick={() => handleAnswerSubmit(q.id, null, val)}
+                              onClick={() =>
+                                handleAnswerSubmit(
+                                  q.id,
+                                  null,
+                                  val,
+                                  null,
+                                  val === 'Yes' ? true : val === 'No' ? false : null
+                                )
+                              }
                               className="btn btn-outline btn-sm"
                             >
                               {val}
@@ -1638,7 +2148,7 @@ export default function AssessmentWizardPage() {
                     <h2 style={{ fontSize: '1.5rem', fontWeight: 800, margin: 0 }}>
                       AI Risk Assessment Result
                     </h2>
-                    <TriageBadge level={riskResult.triage_level} />
+                    <TriageBadge level={riskResult.triage_level || riskResult.risk_level} />
                   </div>
                   <p style={{ color: 'var(--color-text-muted)', fontSize: '0.9rem', margin: 0 }}>
                     Transparent multi-factor triage score computed for {selectedPet?.name}.
@@ -1655,9 +2165,9 @@ export default function AssessmentWizardPage() {
                     padding: '1rem 1.5rem',
                     borderRadius: 'var(--radius-lg)',
                     backgroundColor:
-                      riskResult.triage_level === 'emergency' || riskResult.triage_level === 'high'
+                      ['emergency', 'high'].includes(String(riskResult.triage_level || riskResult.risk_level || '').toLowerCase())
                         ? 'rgba(239, 68, 68, 0.1)'
-                        : riskResult.triage_level === 'moderate'
+                        : String(riskResult.triage_level || riskResult.risk_level || '').toLowerCase() === 'moderate'
                         ? 'rgba(234, 88, 12, 0.1)'
                         : 'rgba(16, 185, 129, 0.1)',
                     border: '1px solid var(--color-border)',
@@ -1672,9 +2182,9 @@ export default function AssessmentWizardPage() {
                       fontWeight: 900,
                       lineHeight: 1.1,
                       color:
-                        riskResult.triage_level === 'emergency' || riskResult.triage_level === 'high'
+                        ['emergency', 'high'].includes(String(riskResult.triage_level || riskResult.risk_level || '').toLowerCase())
                           ? 'var(--color-danger)'
-                          : riskResult.triage_level === 'moderate'
+                          : String(riskResult.triage_level || riskResult.risk_level || '').toLowerCase() === 'moderate'
                           ? 'var(--color-warning)'
                           : 'var(--color-success)',
                     }}
@@ -1838,6 +2348,13 @@ export default function AssessmentWizardPage() {
                 </div>
               )}
 
+              {/* Report Generation Error */}
+              {reportError && (
+                <div style={{ width: '100%', marginBottom: '1.25rem' }}>
+                  <ErrorMessage message={reportError} onRetry={handleGenerateReport} />
+                </div>
+              )}
+
               {/* Action Buttons */}
               <div
                 style={{
@@ -1848,6 +2365,7 @@ export default function AssessmentWizardPage() {
                   gap: '1rem',
                   paddingTop: '1.5rem',
                   borderTop: '1px solid var(--color-border)',
+                  width: '100%',
                 }}
               >
                 <button
@@ -1864,7 +2382,7 @@ export default function AssessmentWizardPage() {
                   style={{ padding: '0.85rem 1.75rem', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
                 >
                   <FileText size={18} />
-                  {generatingReport ? 'Generating Report...' : 'Generate Official Veterinary Report'}
+                  {generatingReport ? 'Generating AI Report...' : 'Give AI Report'}
                 </button>
               </div>
             </div>

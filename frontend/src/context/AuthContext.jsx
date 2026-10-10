@@ -36,15 +36,16 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const checkAuth = async () => {
       const token = localStorage.getItem('vetvision_access_token');
-      if (!token) {
+      if (!token || token === 'undefined' || token === 'null') {
         setIsLoading(false);
         return;
       }
 
       try {
         const userData = await authApi.getCurrentUser();
-        setUser(userData);
-        localStorage.setItem('vetvision_user', JSON.stringify(userData));
+        const profile = userData?.data || userData;
+        setUser(profile);
+        localStorage.setItem('vetvision_user', JSON.stringify(profile));
       } catch (err) {
         if (err.status === 401) {
           logout();
@@ -66,36 +67,50 @@ export const AuthProvider = ({ children }) => {
   }, [logout]);
 
   const login = async (credentials) => {
-    const data = await authApi.login(credentials);
-    // Backend returns { user, tokens: { access_token, refresh_token } }
-    const token = data.tokens?.access_token;
-    const profile = data.user;
+    const res = await authApi.login(credentials);
+    const data = res?.data || res;
+    const token = data?.tokens?.access_token || res?.tokens?.access_token;
+    const profile = data?.user || res?.user;
+
+    if (!token) {
+      throw new Error('Authentication succeeded but access token was missing.');
+    }
 
     localStorage.setItem('vetvision_access_token', token);
-    localStorage.setItem('vetvision_user', JSON.stringify(profile));
+    localStorage.setItem('vetvision_user', JSON.stringify(profile || {}));
 
     setAccessToken(token);
     setUser(profile);
+    setIsLoading(false);
     return profile;
   };
 
   const register = async (userData) => {
-    const data = await authApi.register(userData);
-    const token = data.tokens?.access_token;
-    const profile = data.user;
+    const res = await authApi.register(userData);
+    const data = res?.data || res;
+    const token = data?.tokens?.access_token || res?.tokens?.access_token;
+    const profile = data?.user || res?.user;
+
+    if (!token) {
+      throw new Error('Registration succeeded but access token was missing.');
+    }
 
     localStorage.setItem('vetvision_access_token', token);
-    localStorage.setItem('vetvision_user', JSON.stringify(profile));
+    localStorage.setItem('vetvision_user', JSON.stringify(profile || {}));
 
     setAccessToken(token);
     setUser(profile);
+    setIsLoading(false);
     return profile;
   };
+
+  const storedToken = localStorage.getItem('vetvision_access_token');
+  const isTokenValid = Boolean(storedToken && storedToken !== 'undefined' && storedToken !== 'null');
 
   const value = {
     user,
     accessToken,
-    isAuthenticated: Boolean(accessToken && user),
+    isAuthenticated: Boolean((accessToken || isTokenValid) && (user || localStorage.getItem('vetvision_user'))),
     isLoading,
     login,
     register,
