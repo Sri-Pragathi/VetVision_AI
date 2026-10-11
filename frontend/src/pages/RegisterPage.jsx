@@ -34,7 +34,10 @@ export const RegisterPage = () => {
       await register({ name, email, password });
       navigate('/dashboard', { replace: true });
     } catch (err) {
-      setError(err.message || 'Registration failed. Please check form values.');
+      const msg = typeof err?.message === 'string'
+        ? err.message
+        : (typeof err === 'string' ? err : 'Registration failed. Please check form values.');
+      setError(msg);
     } finally {
       setLoading(false);
     }

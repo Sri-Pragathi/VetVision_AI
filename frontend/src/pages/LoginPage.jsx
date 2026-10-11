@@ -48,7 +48,10 @@ export const LoginPage = () => {
       await login({ email, password });
       navigate(from || '/dashboard', { replace: true });
     } catch (err) {
-      setError(err.message || 'Login failed. Please check credentials.');
+      const msg = typeof err?.message === 'string'
+        ? err.message
+        : (typeof err === 'string' ? err : 'Login failed. Please check credentials.');
+      setError(msg);
     } finally {
       setLoading(false);
     }

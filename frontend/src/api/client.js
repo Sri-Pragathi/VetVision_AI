@@ -48,11 +48,25 @@ apiClient.interceptors.response.use(
       window.dispatchEvent(new Event('vetvision_auth_expired'));
     }
 
-    const message =
+    let message =
       error.response?.data?.message ||
-      error.response?.data?.error ||
+      (typeof error.response?.data?.error === 'string'
+        ? error.response?.data?.error
+        : error.response?.data?.error?.message) ||
       error.message ||
       'An unexpected error occurred. Please try again.';
+
+    if (typeof message === 'object') {
+      try {
+        message = JSON.stringify(message);
+      } catch {
+        message = 'An unexpected server error occurred.';
+      }
+    }
+
+    if (error.response?.status === 404 && (url.includes('/api/') || String(url).startsWith('/'))) {
+      message = 'Backend API is unreachable. Please verify that the backend server is deployed and VITE_API_BASE_URL is configured.';
+    }
 
     const customError = new Error(message);
     customError.status = error.response?.status;
