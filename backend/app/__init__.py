@@ -83,4 +83,9 @@ def create_app(config_name: Optional[str] = None) -> Flask:
     # Register all API v1 routes
     register_routes(application)
 
+    # Root health check endpoint for cloud platform probes (Render, AWS, GCP)
+    @application.route("/", methods=["GET", "HEAD"])
+    def root_ping():
+        return {"status": "healthy", "service": "VetVision AI Backend", "version": "1.0.0"}, 200
+
     return application
