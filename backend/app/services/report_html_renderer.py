@@ -28,7 +28,9 @@ class ReportHtmlRenderer:
         emergency = report_data.get("emergency") or {}
         recommendation = report_data.get("recommendation") or {}
         handoff = report_data.get("veterinary_handoff") or {}
+        doctor_review = report_data.get("doctor_review") or {}
         disclaimer = report_data.get("disclaimer") or ""
+        care_guide = report_data.get("immediate_care_guide") or {}
 
         risk_level = risk.get("risk_level", "LOW")
         risk_score = risk.get("risk_score", 0)
@@ -41,6 +43,154 @@ class ReportHtmlRenderer:
             "HIGH": "#c62828",
             "EMERGENCY": "#b71c1c",
         }.get(risk_level, "#37474f")
+
+        # Format AI Pet Care Guide
+        care_guide_html = ""
+        if care_guide:
+            scenario_title = cls._esc(care_guide.get("title") or care_guide.get("scenario_title") or "General Supportive Care")
+            intro_summary = cls._esc(care_guide.get("subtitle") or care_guide.get("intro_summary") or "")
+            urgency_tier = cls._esc(care_guide.get("urgency", {}).get("classification") or care_guide.get("triage_urgency_level") or risk_level)
+
+            # Section A: What to do now
+            what_to_do_items = care_guide.get("section_a_what_to_do_now") or care_guide.get("what_to_do_now") or []
+            what_to_do_rows = "".join([
+                f"<li style='margin-bottom: 8px;'><span class='tag tag-passed' style='margin-right: 6px;'>{cls._esc(item.get('badge') or ('CRITICAL' if item.get('is_critical') else 'STEP ' + str(item.get('step', ''))))}</span><strong>{cls._esc(item.get('title'))}:</strong> {cls._esc(item.get('instruction') or item.get('detail'))}</li>"
+                for item in what_to_do_items
+            ])
+
+            # Section B: What NOT to do
+            what_not_to_do_items = care_guide.get("section_b_what_to_avoid") or care_guide.get("what_not_to_do") or []
+            what_not_rows = "".join([
+                f"<li style='margin-bottom: 8px;'><span class='tag tag-high' style='margin-right: 6px;'>NEVER</span><strong>{cls._esc(item.get('rule') or item.get('warning'))}</strong> — <span style='color: #991b1b;'>{cls._esc(item.get('detail') or item.get('reason'))}</span></li>"
+                for item in what_not_to_do_items
+            ])
+
+            # Section C: What to monitor
+            what_to_mon_items = care_guide.get("section_c_what_to_monitor") or care_guide.get("what_to_monitor") or []
+            what_to_mon_rows = "".join([
+                f"<li style='margin-bottom: 8px;'><strong>{cls._esc(item.get('indicator') or item.get('name') or str(item))}:</strong> Red flag: <span style='color: #c2410c;'>{cls._esc(item.get('red_flag') or item.get('cutoff') or 'Sudden worsening or change')}</span></li>"
+                if isinstance(item, dict) else f"<li style='margin-bottom: 8px;'>{cls._esc(str(item))}</li>"
+                for item in what_to_mon_items
+            ])
+
+            # Section D: When to seek care
+            seek_care = care_guide.get("section_d_when_to_seek_care") or care_guide.get("when_to_seek_care") or {}
+            tiers = seek_care.get("tiers") or {}
+            red_flags = seek_care.get("emergency_escalation_criteria") or seek_care.get("critical_red_flags") or []
+            red_flags_html = "".join([f"<li>⚠️ {cls._esc(rf)}</li>" for rf in red_flags])
+
+            def _tier_badge(t_name, text):
+                is_active = (t_name in urgency_tier or urgency_tier in t_name)
+                border = "border: 2px solid #b71c1c; background: #fef2f2;" if is_active and "EMERGENCY" in t_name else (
+                    "border: 2px solid #ea580c; background: #fff7ed;" if is_active and "URGENT" in t_name else (
+                        "border: 2px solid #0284c7; background: #f0f9ff;" if is_active else "background: #f8fafc; border: 1px solid #e2e8f0;"
+                    )
+                )
+                active_lbl = " <strong style='color:#b71c1c;'>[ACTIVE RECOMMENDATION]</strong>" if is_active else ""
+                return f"<div style='padding: 10px 14px; border-radius: 6px; margin-bottom: 8px; {border}'><strong style='font-size: 13px;'>{t_name}</strong>{active_lbl}<p style='margin: 4px 0 0; font-size: 12px; color: #334155;'>{cls._esc(text)}</p></div>"
+
+            tier_boxes = (
+                _tier_badge("EMERGENCY", tiers.get("EMERGENCY") or seek_care.get("cutoff_instruction") or "Immediate emergency clinic visit.") +
+                _tier_badge("URGENT", tiers.get("URGENT") or "Same-day clinic evaluation.") +
+                _tier_badge("APPOINTMENT", tiers.get("APPOINTMENT") or "Book within 24-48 hours.") +
+                _tier_badge("HOME_MONITORING", tiers.get("HOME_MONITORING") or seek_care.get("action_recommendation") or "Monitor closely at home.")
+            )
+
+            # Section E: Why this guidance is shown
+            why_guidance = care_guide.get("section_e_why_shown") or care_guide.get("why_guidance_shown") or {}
+            reasons = why_guidance.get("rationale_factors") or why_guidance.get("primary_reasons") or []
+            reasons_html = "".join([
+                f"<li><strong>{cls._esc(r.get('category'))}:</strong> {cls._esc(r.get('finding'))} — <em>{cls._esc(r.get('impact'))}</em></li>"
+                if isinstance(r, dict) else f"<li>{cls._esc(str(r))}</li>"
+                for r in reasons
+            ])
+            visual_vs_reported = cls._esc(why_guidance.get("visual_vs_reported") or "")
+            uncertainties = why_guidance.get("uncertainty_and_missing_data") or why_guidance.get("uncertainty_notes") or []
+            uncertainties_html = "".join([f"<li style='color: #854d0e;'>⚠️ {cls._esc(u)}</li>" for u in uncertainties])
+
+            # Emergency Contacts
+            contacts = care_guide.get("emergency_after_hours") or care_guide.get("emergency_contacts") or {}
+            poison_aspca = "ASPCA Animal Poison Control Center: (888) 426-4435 (24/7)"
+            poison_helpline = "Pet Poison Helpline: (855) 764-7661 (24/7)"
+            aaha_locator = "https://www.aaha.org/your-pet/find-a-hospital/"
+            transport_tip = contacts.get("safe_search_instructions") or contacts.get("transport_tip") or "Call ahead so the emergency triage team is prepared."
+
+            care_guide_html = f"""
+            <!-- AI Pet Care Guide & Safety Precautions -->
+            <div class="section" style="border: 2px solid #0284c7; border-radius: 10px; padding: 22px; background: #ffffff; margin-bottom: 28px;">
+                <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #e0f2fe; padding-bottom: 12px; margin-bottom: 16px;">
+                    <div>
+                        <h2 style="margin: 0; color: #0369a1; font-size: 18px;">🐾 AI Pet Care Guide & Immediate Precautions</h2>
+                        <p style="margin: 4px 0 0; color: #64748b; font-size: 13px;">Understand what you can safely do now, what to avoid, and when your pet needs urgent veterinary care.</p>
+                    </div>
+                    <span class="tag tag-{cls._esc(urgency_tier.lower())}" style="font-size: 12px; padding: 4px 10px;">Care Tier: {cls._esc(urgency_tier)}</span>
+                </div>
+                <div style="background: #f0fdf4; border-left: 4px solid #16a34a; padding: 10px 14px; border-radius: 6px; margin-bottom: 18px; font-size: 13px; color: #166534;">
+                    <strong>Assessment Focus ({scenario_title}):</strong> {intro_summary}
+                </div>
+
+                <!-- Section A -->
+                <div style="margin-bottom: 18px;">
+                    <h3 style="color: #0f766e; font-size: 15px; margin: 0 0 8px 0;">A. What to Do Now (First-Aid & Low-Risk Comfort Measures)</h3>
+                    <ul style="margin: 0; padding-left: 18px; font-size: 13px; color: #1e293b;">{what_to_do_rows}</ul>
+                </div>
+
+                <!-- Section B -->
+                <div style="margin-bottom: 18px; background: #fef2f2; border-left: 4px solid #dc2626; padding: 12px 16px; border-radius: 6px;">
+                    <h3 style="color: #991b1b; font-size: 15px; margin: 0 0 8px 0;">B. What NOT to Do (Strict Precautions & Contraindications)</h3>
+                    <ul style="margin: 0; padding-left: 18px; font-size: 13px; color: #7f1d1d;">{what_not_rows}</ul>
+                </div>
+
+                <!-- Section C -->
+                <div style="margin-bottom: 18px;">
+                    <h3 style="color: #c2410c; font-size: 15px; margin: 0 0 8px 0;">C. What to Monitor (Objective Warning Signs & Deterioration Indicators)</h3>
+                    <ul style="margin: 0; padding-left: 18px; font-size: 13px; color: #1e293b;">{what_to_mon_rows}</ul>
+                </div>
+
+                <!-- Section D -->
+                <div style="margin-bottom: 18px;">
+                    <h3 style="color: #1e293b; font-size: 15px; margin: 0 0 8px 0;">D. When to Seek Veterinary Care (Decision Matrix)</h3>
+                    <div style="margin-bottom: 10px;">{tier_boxes}</div>
+                    {"<div style='background: #fff7ed; border-left: 4px solid #ea580c; padding: 10px 14px; border-radius: 6px; font-size: 12px; color: #9a3412;'><strong>Critical Red-Flag Symptoms:</strong><ul style='margin: 4px 0 0; padding-left: 16px;'>" + red_flags_html + "</ul></div>" if red_flags else ""}
+                </div>
+
+                <!-- Section E -->
+                <div style="margin-bottom: 18px; background: #f8fafc; border: 1px solid #e2e8f0; padding: 14px 16px; border-radius: 6px;">
+                    <h3 style="color: #0f172a; font-size: 15px; margin: 0 0 8px 0;">E. Why This Guidance Is Shown (Transparent Rationale)</h3>
+                    <div style="font-size: 13px; color: #334155; margin-bottom: 6px;"><strong>Clinical Factors Considered:</strong></div>
+                    <ul style="margin: 0 0 8px 0; padding-left: 18px; font-size: 12px; color: #475569;">{reasons_html}</ul>
+                    {f"<div style='font-size: 12px; color: #475569; margin-bottom: 6px;'><strong>Visual & Diagnostic Correlation:</strong> {visual_vs_reported}</div>" if visual_vs_reported else ""}
+                    {f"<div style='font-size: 12px; margin-top: 8px;'><strong>Data Completeness & Uncertainty:</strong><ul style='margin: 4px 0 0; padding-left: 18px;'>" + uncertainties_html + "</ul></div>" if uncertainties else ""}
+                </div>
+
+                <!-- After-Hours Emergency Contacts Box -->
+                <div style="background: #eff6ff; border: 1px solid #bfdbfe; padding: 12px 16px; border-radius: 6px; font-size: 12px; color: #1e3a8a;">
+                    <div style="font-weight: 700; margin-bottom: 4px;">🌙 Night, Weekend & Holiday Veterinary Emergency Resources:</div>
+                    <div>• <strong>ASPCA Animal Poison Control Center:</strong> {poison_aspca}</div>
+                    <div>• <strong>Pet Poison Helpline:</strong> {poison_helpline}</div>
+                    <div>• <strong>AAHA 24-Hour Emergency Hospital Locator:</strong> <a href="{aaha_locator}" target="_blank" style="color: #1d4ed8;">{aaha_locator}</a></div>
+                    <div style="margin-top: 4px; font-style: italic;">🚨 Transport Guidance: {transport_tip}</div>
+                </div>
+            </div>
+            """
+
+        # Format Doctor Clinical Review Box if present (historical support only)
+        doctor_review_html = ""
+        if doctor_review and (doctor_review.get("doctor_notes") or doctor_review.get("override_triage_level") or doctor_review.get("prescriptions")):
+            override_str = f" | Triage Assigned: <strong>{cls._esc((doctor_review.get('override_triage_level') or '').upper())}</strong>" if doctor_review.get("override_triage_level") else ""
+            notes_str = f"<p><strong>Clinical Notes:</strong> {cls._esc(doctor_review.get('doctor_notes'))}</p>" if doctor_review.get("doctor_notes") else ""
+            rec_str = f"<p><strong>Treatment Recommendations:</strong> {cls._esc(doctor_review.get('recommendations'))}</p>" if doctor_review.get("recommendations") else ""
+            rx_str = f"<div class='info-card' style='background:#f0fdf4; border-left:4px solid #16a34a; margin-top:8px;'><label style='color:#166534;'>Prescriptions & Medications (Rx)</label><p style='margin:4px 0 0; color:#14532d; font-weight:600;'>{cls._esc(doctor_review.get('prescriptions'))}</p></div>" if doctor_review.get("prescriptions") else ""
+
+            doctor_review_html = f"""
+            <div class="handoff-box" style="background: #f0fdf4; border-color: #86efac; margin-bottom: 20px;">
+                <h3 style="color: #166534;">🩺 Verified Veterinarian Clinical Review & Treatment Plan</h3>
+                <p><strong>Reviewing Clinician:</strong> {cls._esc(doctor_review.get('doctor_name') or 'Attending Veterinarian')} ({cls._esc((doctor_review.get('reviewed_at') or '')[:10])}){override_str}</p>
+                {notes_str}
+                {rec_str}
+                {rx_str}
+            </div>
+            """
 
         # Build symptoms rows
         symptoms_html = ""
@@ -364,6 +514,7 @@ class ReportHtmlRenderer:
 
         {emergency_banner}
         {warnings_html}
+        {doctor_review_html}
 
         <!-- Risk Assessment Banner -->
         <div class="risk-banner">
@@ -373,6 +524,8 @@ class ReportHtmlRenderer:
             </div>
             <div class="risk-score">{cls._esc(risk_score)}/100</div>
         </div>
+
+        {care_guide_html}
 
         <!-- Veterinary Handoff Summary -->
         <div class="handoff-box">

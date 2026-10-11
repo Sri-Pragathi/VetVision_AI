@@ -139,3 +139,16 @@ def delete_image(image_id: str):
         message="Assessment image deleted successfully",
         status_code=200,
     )
+
+
+@image_bp.route("/assessment-images/<string:image_id>/file", methods=["GET"])
+@jwt_required()
+def get_image_file_content(image_id: str):
+    """Stream stored pet image binary with role-authorized access."""
+    from flask import send_file
+    user_id = get_jwt_identity()
+    abs_path, mime_type = ImageAnalysisService.get_image_file(
+        image_id=image_id,
+        user_id=user_id,
+    )
+    return send_file(abs_path, mimetype=mime_type)

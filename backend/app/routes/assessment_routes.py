@@ -159,6 +159,41 @@ def add_note(assessment_id: str):
     )
 
 
+@assessment_bp.route("/active-draft", methods=["GET"])
+@jwt_required()
+def get_active_draft():
+    """Retrieve the latest active in-progress assessment draft for the user or pet."""
+    user_id = get_jwt_identity()
+    pet_id = request.args.get("pet_id")
+    draft = AssessmentService.get_active_draft(user_id=user_id, pet_id=pet_id)
+    return success_response(
+        data=draft,
+        message="Active draft retrieved" if draft else "No active draft found",
+        status_code=200,
+    )
+
+
+@assessment_bp.route("/<string:assessment_id>/draft", methods=["PUT"])
+@jwt_required()
+def save_draft(assessment_id: str):
+    """Save intake step position and draft state for an in-progress assessment."""
+    user_id = get_jwt_identity()
+    payload = request.get_json(silent=True) or {}
+    current_step = payload.get("current_step", 1)
+    draft_data = payload.get("draft_data")
+    result = AssessmentService.save_draft(
+        assessment_id=assessment_id,
+        user_id=user_id,
+        current_step=current_step,
+        draft_data=draft_data,
+    )
+    return success_response(
+        data=result,
+        message="Intake draft saved successfully",
+        status_code=200,
+    )
+
+
 @assessment_bp.route("/<string:assessment_id>/ai-data", methods=["GET"])
 @jwt_required()
 def get_ai_data_payload(assessment_id: str):

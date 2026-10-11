@@ -13,8 +13,8 @@ import {
   CheckCircle2,
   HeartPulse,
   FileText,
-  Stethoscope,
   ArrowRight,
+  Stethoscope,
 } from 'lucide-react';
 
 export const LoginPage = () => {
@@ -46,7 +46,7 @@ export const LoginPage = () => {
 
     try {
       await login({ email, password });
-      navigate('/dashboard', { replace: true });
+      navigate(from || '/dashboard', { replace: true });
     } catch (err) {
       setError(err.message || 'Login failed. Please check credentials.');
     } finally {
@@ -54,7 +54,7 @@ export const LoginPage = () => {
     }
   };
 
-  const handleQuickDemo = () => {
+  const handleQuickDemoOwner = () => {
     setEmail('john.doe@vetvision.ai');
     setPassword('Password123!');
   };
@@ -129,7 +129,7 @@ export const LoginPage = () => {
               }}
             >
               <Activity size={15} color="#5eead4" strokeWidth={2.5} />
-              <span>Clinical Triage Platform</span>
+              <span>AI Pet Care Assistant</span>
             </div>
 
             {/* Main Headline */}
@@ -143,7 +143,7 @@ export const LoginPage = () => {
                 color: '#ffffff',
               }}
             >
-              Intelligent Veterinary Triage & Health Intelligence
+              Intelligent Pet Care & Health Guidance
             </h1>
 
             {/* Project Description */}
@@ -156,9 +156,9 @@ export const LoginPage = () => {
                 maxWidth: '460px',
               }}
             >
-              VetVision AI bridges pet parents and veterinary practices with calibrated
-              clinical risk scoring, multi-symptom Bayesian triage, and structured
-              13-point veterinary clinic handoff records.
+              VetVision AI empowers pet owners with intelligent health risk assessment,
+              evidence-based supportive first-aid care, and instant guidance when
+              veterinary clinics are closed.
             </p>
 
             {/* Feature Pillars */}
@@ -287,7 +287,7 @@ export const LoginPage = () => {
               Sign In to Your Account
             </h2>
             <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-              Enter your credentials to access patient charts, vitals, and reports.
+              Enter your credentials to access your pet profiles, health reports, and AI care guide.
             </p>
           </div>
 
@@ -424,7 +424,7 @@ export const LoginPage = () => {
             </button>
           </form>
 
-          {/* Quick-Fill Sample Demo Account */}
+          {/* Quick-Fill Sample Demo Accounts */}
           <div
             style={{
               marginTop: '22px',
@@ -435,31 +435,33 @@ export const LoginPage = () => {
               textAlign: 'center',
             }}
           >
-            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px' }}>
-              Want to test pre-configured clinical pet records?
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '10px' }}>
+              Want to test pre-configured accounts? Click below to fill:
             </div>
-            <button
-              type="button"
-              onClick={handleQuickDemo}
-              className="btn btn-sm"
-              style={{
-                width: '100%',
-                backgroundColor: 'var(--bg-surface)',
-                border: '1px solid var(--border-light)',
-                color: 'var(--primary)',
-                fontWeight: '700',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-                padding: '8px 12px',
-                borderRadius: 'var(--radius-md)',
-                boxShadow: 'var(--shadow-xs)',
-              }}
-            >
-              <Sparkles size={14} color="var(--primary)" />
-              Quick-Fill Demo Account (john.doe@vetvision.ai)
-            </button>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '8px' }}>
+              <button
+                type="button"
+                onClick={handleQuickDemoOwner}
+                className="btn btn-sm"
+                style={{
+                  backgroundColor: 'var(--bg-surface)',
+                  border: '1px solid var(--border-light)',
+                  color: 'var(--primary)',
+                  fontWeight: '700',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  padding: '8px 10px',
+                  borderRadius: 'var(--radius-md)',
+                  boxShadow: 'var(--shadow-xs)',
+                  fontSize: '12px',
+                }}
+              >
+                <Sparkles size={13} color="var(--primary)" />
+                Quick Fill Demo Owner Credentials
+              </button>
+            </div>
           </div>
 
           <p

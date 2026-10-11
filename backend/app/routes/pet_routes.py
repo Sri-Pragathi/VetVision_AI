@@ -111,3 +111,35 @@ def list_pet_assessments(pet_id: str):
         message="Health assessments retrieved successfully",
         status_code=200,
     )
+
+
+@pet_bp.route("/<string:pet_id>/avatar", methods=["POST"])
+@jwt_required()
+def upload_pet_avatar(pet_id: str):
+    """Upload and attach an avatar image for a pet."""
+    from app.utils.error_handlers import ValidationException
+    user_id = get_jwt_identity()
+    file_obj = request.files.get("image") or request.files.get("file") or request.files.get("avatar")
+    if not file_obj:
+        raise ValidationException("No image file provided in upload request. Expected multipart field 'image', 'file', or 'avatar'.")
+
+    updated_pet = PetService.upload_pet_avatar(
+        pet_id=pet_id,
+        owner_id=user_id,
+        file_obj=file_obj,
+    )
+    return success_response(
+        data=updated_pet,
+        message="Pet avatar uploaded successfully",
+        status_code=200,
+    )
+
+
+@pet_bp.route("/<string:pet_id>/avatar", methods=["GET"])
+@jwt_required()
+def get_pet_avatar_file(pet_id: str):
+    """Retrieve and stream the pet avatar image file with role authorization."""
+    from flask import send_file
+    user_id = get_jwt_identity()
+    abs_path, mime_type = PetService.get_pet_avatar(pet_id=pet_id, user_id=user_id)
+    return send_file(abs_path, mimetype=mime_type)

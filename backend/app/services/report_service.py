@@ -449,6 +449,34 @@ class ReportService:
             "key_findings": risk_analysis.key_factors or [],
         }
 
+        # Doctor Clinical Review Snapshot (if reviewed prior to report generation)
+        doctor_review_data = None
+        if assessment.doctor_reviews:
+            latest_dr = assessment.doctor_reviews[0]
+            doctor_review_data = {
+                "id": latest_dr.id,
+                "doctor_name": latest_dr.doctor.name if latest_dr.doctor else "Attending Veterinarian",
+                "status": latest_dr.status,
+                "override_triage_level": latest_dr.override_triage_level,
+                "doctor_notes": latest_dr.doctor_notes,
+                "recommendations": latest_dr.recommendations,
+                "prescriptions": latest_dr.prescriptions,
+                "reviewed_at": latest_dr.reviewed_at.isoformat() if latest_dr.reviewed_at else None,
+            }
+
+        # 5b. Synthesize Evidence-Based AI Pet Care Guide
+        from app.services.immediate_care_service import ImmediateCareService
+        care_guide = ImmediateCareService.synthesize_guide(
+            assessment_data={
+                "symptoms": symptoms_data,
+                "observations": observations_data,
+                "follow_up_findings": follow_up_data,
+                "risk_analysis": risk_data,
+            },
+            pet_data=pet_profile_data,
+            risk_analysis=risk_data,
+        )
+
         # Master Snapshot Assembly
         report_data = {
             "metadata": {
@@ -471,6 +499,8 @@ class ReportService:
             "emergency": emergency_data,
             "recommendation": recommendation_data,
             "veterinary_handoff": handoff_data,
+            "immediate_care_guide": care_guide,
+            "doctor_review": doctor_review_data,
             "disclaimer": cls.STANDARD_DISCLAIMER,
         }
 
@@ -534,12 +564,48 @@ class ReportService:
 
     @classmethod
     def get_report_by_id(cls, report_id: str, user_id: str) -> Dict[str, Any]:
-        """Retrieve a specific report snapshot with full structured data."""
+        """Retrieve a specific report snapshot with full structured data and AI Pet Care Guide."""
         report = cls._verify_report_ownership(report_id, user_id)
-        return report.to_dict(include_full_data=True)
+        data = report.to_dict(include_full_data=True)
+        report_data = data.get("report_data") or {}
+        if "immediate_care_guide" not in report_data:
+            from app.services.immediate_care_service import ImmediateCareService
+            report_data["immediate_care_guide"] = ImmediateCareService.synthesize_guide(
+                assessment_data=report_data,
+                pet_data=report_data.get("pet") or {},
+                risk_analysis=report_data.get("risk_analysis"),
+            )
+            data["report_data"] = report_data
+
+        assessment = report.assessment
+        if assessment and assessment.doctor_reviews:
+            latest_dr = assessment.doctor_reviews[0]
+            data["latest_doctor_review"] = latest_dr.to_dict()
+        return data
 
     @classmethod
     def get_report_html(cls, report_id: str, user_id: str) -> str:
         """Render standalone, injection-safe HTML document for viewing or printing."""
         report = cls._verify_report_ownership(report_id, user_id)
-        return ReportHtmlRenderer.render(report.report_data)
+        report_data = dict(report.report_data or {})
+        if "immediate_care_guide" not in report_data:
+            from app.services.immediate_care_service import ImmediateCareService
+            report_data["immediate_care_guide"] = ImmediateCareService.synthesize_guide(
+                assessment_data=report_data,
+                pet_data=report_data.get("pet") or {},
+                risk_analysis=report_data.get("risk_analysis"),
+            )
+
+        if report.assessment and report.assessment.doctor_reviews:
+            latest_dr = report.assessment.doctor_reviews[0]
+            report_data["doctor_review"] = {
+                "id": latest_dr.id,
+                "doctor_name": latest_dr.doctor.name if latest_dr.doctor else "Attending Veterinarian",
+                "status": latest_dr.status,
+                "override_triage_level": latest_dr.override_triage_level,
+                "doctor_notes": latest_dr.doctor_notes,
+                "recommendations": latest_dr.recommendations,
+                "prescriptions": latest_dr.prescriptions,
+                "reviewed_at": latest_dr.reviewed_at.isoformat() if latest_dr.reviewed_at else None,
+            }
+        return ReportHtmlRenderer.render(report_data)

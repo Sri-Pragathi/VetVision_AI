@@ -385,6 +385,11 @@ export default function AssessmentWizardPage() {
   const [generatingReport, setGeneratingReport] = useState(false);
   const [reportError, setReportError] = useState(null);
 
+  // Draft Autosave & Exact Resumption State
+  const [pendingDraft, setPendingDraft] = useState(null);
+  const [isSavingDraft, setIsSavingDraft] = useState(false);
+  const [lastSavedTime, setLastSavedTime] = useState(null);
+
   // Initial Load: Fetch Pets & Catalog
   useEffect(() => {
     loadInitialData();
@@ -408,10 +413,22 @@ export default function AssessmentWizardPage() {
       if (resumeId) {
         // Resume existing assessment
         await resumeExistingAssessment(resumeId, petList);
-      } else if (preselectedPetId) {
-        const found = petList.find((p) => p.id === preselectedPetId);
-        if (found) {
-          setSelectedPet(found);
+      } else {
+        if (preselectedPetId) {
+          const found = petList.find((p) => p.id === preselectedPetId);
+          if (found) {
+            setSelectedPet(found);
+          }
+        }
+        // Check for any active in-progress draft to offer resumption
+        try {
+          const draftRes = await assessmentApi.getActiveDraft(preselectedPetId);
+          const activeDraftData = draftRes?.data || draftRes;
+          if (activeDraftData && activeDraftData.id && activeDraftData.status === 'in_progress') {
+            setPendingDraft(activeDraftData);
+          }
+        } catch {
+          // Non-blocking
         }
       }
     } catch (err) {
@@ -427,7 +444,7 @@ export default function AssessmentWizardPage() {
       const assData = assRes.data || assRes;
       setAssessmentId(assId);
 
-      const foundPet = petList.find((p) => p.id === assData.pet_id);
+      const foundPet = (petList || pets).find((p) => p.id === assData.pet_id);
       if (foundPet) setSelectedPet(foundPet);
 
       if (assData.symptoms) {
@@ -444,15 +461,68 @@ export default function AssessmentWizardPage() {
         });
       }
 
+      // Restore stored draft_data if available
+      if (assData.draft_data) {
+        if (assData.draft_data.answers) {
+          setAnswers(assData.draft_data.answers);
+        }
+        if (assData.draft_data.answeredQuestions) {
+          setAnsweredQuestions(assData.draft_data.answeredQuestions);
+        }
+        if (assData.draft_data.observations) {
+          setObservations((prev) => ({ ...prev, ...assData.draft_data.observations }));
+        }
+      }
+
       // Load images if any
       const imgRes = await imageApi.listImages(assId).catch(() => ({ data: [] }));
       setUploadedImages(imgRes.data || imgRes || []);
 
-      setCurrentStep(2);
+      const resumeStep = assData.current_step && assData.current_step >= 1 && assData.current_step <= 6
+        ? assData.current_step
+        : (assData.symptoms && assData.symptoms.length > 0 ? 3 : 2);
+
+      setCurrentStep(resumeStep);
+      setPendingDraft(null);
     } catch (err) {
       console.error('Error resuming assessment:', err);
     }
   };
+
+  // Debounced Autosave Effect
+  useEffect(() => {
+    if (!assessmentId || currentStep <= 1 || currentStep >= 7) return;
+
+    const timer = setTimeout(async () => {
+      try {
+        setIsSavingDraft(true);
+        const draftPayload = {
+          current_step: currentStep,
+          draft_data: {
+            step: currentStep,
+            symptoms: assessmentSymptoms.map((s) => ({
+              symptom_id: s.symptom_id || s.id,
+              severity: s.severity,
+              duration_value: s.duration_value,
+              duration_unit: s.duration_unit,
+              notes: s.notes,
+            })),
+            answers,
+            answeredQuestions,
+            observations,
+          },
+        };
+        await assessmentApi.saveDraft(assessmentId, draftPayload);
+        setLastSavedTime(new Date());
+      } catch (err) {
+        console.error('Draft autosave failed:', err);
+      } finally {
+        setIsSavingDraft(false);
+      }
+    }, 1200);
+
+    return () => clearTimeout(timer);
+  }, [assessmentId, currentStep, assessmentSymptoms, answers, answeredQuestions, observations]);
 
   // Step 1: Confirm Pet & Create Assessment
   const handleSelectPet = async (pet) => {
@@ -851,9 +921,9 @@ export default function AssessmentWizardPage() {
                   {getSpeciesEmoji(selectedPet.species)}
                 </span>
                 <div>
-                  <div style={{ fontWeight: 700, fontSize: '0.85rem', lineHeight: 1 }}>{selectedPet.name}</div>
+                  <div style={{ fontWeight: 700, fontSize: '0.85rem', lineHeight: 1 }}>{selectedPet.name} — {selectedPet.species}</div>
                   <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
-                    {selectedPet.breed || selectedPet.species}
+                    {selectedPet.breed || 'Mixed Breed'} {selectedPet.weight ? `• ${selectedPet.weight} ${selectedPet.weight_unit || 'kg'}` : ''}
                   </div>
                 </div>
               </div>
@@ -918,11 +988,95 @@ export default function AssessmentWizardPage() {
               );
             })}
           </div>
+
+          {assessmentId && currentStep > 1 && currentStep < 7 && (
+            <div
+              style={{
+                marginTop: '0.6rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'flex-end',
+                gap: '0.4rem',
+                fontSize: '0.8rem',
+                color: 'var(--color-text-muted)',
+              }}
+            >
+              <Clock size={13} color="var(--color-primary)" />
+              <span>
+                {isSavingDraft
+                  ? 'Autosaving intake progress...'
+                  : (lastSavedTime
+                    ? `Draft saved at ${lastSavedTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`
+                    : 'Draft autosave active')}
+              </span>
+            </div>
+          )}
         </div>
 
         {error && (
           <div style={{ marginBottom: '1.5rem' }}>
             <ErrorMessage message={error} onRetry={() => setError(null)} />
+          </div>
+        )}
+
+        {/* Unfinished Draft Resumption Alert */}
+        {pendingDraft && currentStep === 1 && (
+          <div
+            style={{
+              marginBottom: '1.5rem',
+              padding: '1.25rem 1.5rem',
+              borderRadius: 'var(--radius-lg)',
+              backgroundColor: 'rgba(59, 130, 246, 0.08)',
+              border: '1px solid rgba(59, 130, 246, 0.3)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '1rem',
+              flexWrap: 'wrap',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+              <div
+                style={{
+                  width: '42px',
+                  height: '42px',
+                  borderRadius: '12px',
+                  backgroundColor: 'white',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'var(--color-primary)',
+                  boxShadow: 'var(--shadow-sm)',
+                }}
+              >
+                <Clock size={22} />
+              </div>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--color-text-main)' }}>
+                  Unfinished Health Intake Found
+                </div>
+                <div style={{ fontSize: '0.825rem', color: 'var(--color-text-muted)' }}>
+                  You have an in-progress intake session at Step {pendingDraft.current_step || 2} ({STEPS.find((s) => s.id === (pendingDraft.current_step || 2))?.title || 'Symptom Intake'}).
+                </div>
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <button
+                type="button"
+                onClick={() => setPendingDraft(null)}
+                className="btn btn-outline btn-sm"
+              >
+                Start Fresh
+              </button>
+              <button
+                type="button"
+                onClick={() => resumeExistingAssessment(pendingDraft.id, pets)}
+                className="btn btn-primary btn-sm"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+              >
+                Resume Assessment #{pendingDraft.id.slice(0, 8)} <ArrowRight size={14} />
+              </button>
+            </div>
           </div>
         )}
 
@@ -990,10 +1144,10 @@ export default function AssessmentWizardPage() {
                       </div>
                       <div style={{ flex: 1 }}>
                         <div style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--color-text-main)' }}>
-                          {pet.name}
+                          {pet.name} — {pet.species}
                         </div>
                         <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
-                          {pet.breed || pet.species} • {pet.age_years != null ? `${pet.age_years} yrs` : 'Age unknown'}
+                          {pet.breed || 'Mixed Breed'} • {pet.weight ? `${pet.weight} ${pet.weight_unit || 'kg'}` : (pet.weight_kg ? `${pet.weight_kg} kg` : '')} • {pet.age != null ? `${pet.age} yrs` : (pet.age_years != null ? `${pet.age_years} yrs` : 'Age unknown')}
                         </div>
                       </div>
                       {isSelected && <CheckCircle2 color="var(--color-primary)" size={22} />}

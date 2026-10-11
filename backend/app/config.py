@@ -86,6 +86,10 @@ class BaseConfig:
     ALLOWED_IMAGE_EXTENSIONS = {"jpg", "jpeg", "png", "webp"}
     ALLOWED_IMAGE_MIMETYPES = {"image/jpeg", "image/png", "image/webp"}
 
+    # Groq AI LLM Engine
+    GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
+    GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
+
 
 class DevelopmentConfig(BaseConfig):
     """Development environment configuration."""

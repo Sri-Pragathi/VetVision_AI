@@ -32,6 +32,16 @@ class HealthAssessment(db.Model):
         nullable=False,
         default=STATUS_IN_PROGRESS,
     )
+    current_step = db.Column(
+        db.Integer,
+        nullable=False,
+        default=1,
+        server_default="1",
+    )
+    draft_data = db.Column(
+        db.JSON,
+        nullable=True,
+    )
     started_at = db.Column(
         db.DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
@@ -103,6 +113,14 @@ class HealthAssessment(db.Model):
         order_by="AssessmentReport.report_version.desc()",
     )
 
+    doctor_reviews = db.relationship(
+        "DoctorReview",
+        back_populates="assessment",
+        cascade="all, delete-orphan",
+        lazy="select",
+        order_by="DoctorReview.created_at.desc()",
+    )
+
     def complete(self) -> None:
         """Mark assessment as completed and set completion timestamp."""
         self.status = self.STATUS_COMPLETED
@@ -118,6 +136,8 @@ class HealthAssessment(db.Model):
             "id": self.id,
             "pet_id": self.pet_id,
             "status": self.status,
+            "current_step": self.current_step,
+            "draft_data": self.draft_data,
             "started_at": self.started_at.isoformat() if self.started_at else None,
             "completed_at": self.completed_at.isoformat() if self.completed_at else None,
             "created_at": self.created_at.isoformat() if self.created_at else None,
@@ -130,6 +150,8 @@ class HealthAssessment(db.Model):
             res["notes"] = [n.to_dict() for n in self.notes] if self.notes else []
             res["risk_analysis"] = self.risk_analysis.to_dict() if self.risk_analysis else None
             res["images"] = [img.to_dict() for img in self.images] if self.images else []
+            res["reports"] = [r.to_dict() for r in self.reports] if self.reports else []
+            res["doctor_reviews"] = [dr.to_dict() for dr in self.doctor_reviews] if self.doctor_reviews else []
 
         return res
 

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { petApi } from '../api/petApi';
-import { apiClient } from '../api/client';
+import { assessmentApi } from '../api/assessmentApi';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import { ErrorMessage } from '../components/common/ErrorMessage';
 import { EmptyState } from '../components/common/EmptyState';
@@ -17,7 +17,12 @@ import {
   Calendar, 
   ShieldAlert,
   ChevronRight,
-  Clock
+  Clock,
+  AlertTriangle,
+  PhoneCall,
+  Sparkles,
+  Bot,
+  MessageSquare
 } from 'lucide-react';
 
 export const DashboardPage = () => {
@@ -26,6 +31,7 @@ export const DashboardPage = () => {
 
   const [pets, setPets] = useState([]);
   const [assessments, setAssessments] = useState([]);
+  const [activeDraft, setActiveDraft] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -39,6 +45,17 @@ export const DashboardPage = () => {
         const petsData = await petApi.getPets();
         const petsList = Array.isArray(petsData) ? petsData : (petsData?.data || []);
         setPets(petsList);
+
+        // Fetch active in-progress draft if any
+        try {
+          const draftRes = await assessmentApi.getActiveDraft();
+          const draftData = draftRes?.data || draftRes;
+          if (draftData && draftData.id && draftData.status === 'in_progress') {
+            setActiveDraft(draftData);
+          }
+        } catch {
+          // Non-blocking
+        }
 
         // Fetch recent assessments across pets
         const allAssessments = [];
@@ -75,6 +92,13 @@ export const DashboardPage = () => {
 
   if (loading) return <LoadingSpinner fullScreen label="Loading clinical overview..." />;
 
+  const hour = new Date().getHours();
+  const greetingTime = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+  const ownerName = user?.name ? user.name.trim() : '';
+  const greetingHeading = ownerName
+    ? `${greetingTime}, ${ownerName}!`
+    : `${greetingTime}! Welcome back.`;
+
   return (
     <div className="container" style={{ padding: '36px 24px 60px' }}>
       {/* Welcome Banner */}
@@ -102,13 +126,13 @@ export const DashboardPage = () => {
             display: 'block',
             marginBottom: '4px',
           }}>
-            Clinical Health Portal
+            Pet Owner Portal &bull; AI Pet Care Assistant
           </span>
           <h1 style={{ fontSize: '26px', fontWeight: '800', color: 'var(--text-main)', letterSpacing: '-0.02em' }}>
-            Welcome back, {user?.name || 'Pet Caregiver'}
+            {greetingHeading}
           </h1>
           <p style={{ fontSize: '14px', color: 'var(--text-muted)', marginTop: '4px' }}>
-            Monitor vital indicators, conduct early triage screenings, and manage veterinary handoff reports.
+            How can we help your pet today? Monitor health indicators, review AI care guides, and keep your pets safe.
           </p>
         </div>
 
@@ -123,6 +147,70 @@ export const DashboardPage = () => {
           </Link>
         </div>
       </div>
+
+      {/* Prominent Continue In-Progress Intake Card */}
+      {activeDraft && (
+        <div
+          style={{
+            backgroundColor: 'var(--bg-surface)',
+            border: '2px solid var(--color-primary, #0d9488)',
+            borderRadius: 'var(--radius-xl)',
+            padding: '24px 28px',
+            marginBottom: '32px',
+            boxShadow: 'var(--shadow-sm)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '16px',
+            background: 'linear-gradient(135deg, #f0fdfa 0%, #ecfeff 100%)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <div
+              style={{
+                width: '52px',
+                height: '52px',
+                borderRadius: '16px',
+                backgroundColor: 'white',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#0d9488',
+                boxShadow: 'var(--shadow-sm)',
+              }}
+            >
+              <Clock size={28} />
+            </div>
+            <div>
+              <span style={{ fontSize: '11px', fontWeight: 800, color: '#0d9488', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                Active Intake Session
+              </span>
+              <h3 style={{ fontSize: '18px', fontWeight: 800, margin: '2px 0 4px', color: 'var(--text-main)' }}>
+                Resume Assessment for {pets.find((p) => p.id === activeDraft.pet_id)?.name || 'Your Pet'}
+              </h3>
+              <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: 0 }}>
+                Paused at <strong>Step {activeDraft.current_step || 2}</strong> &bull; All symptoms, responses, and observations were preserved
+              </p>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button
+              onClick={() => setActiveDraft(null)}
+              className="btn btn-sm btn-secondary"
+            >
+              Dismiss
+            </button>
+            <button
+              onClick={() => navigate(`/assessments/new?resumeId=${activeDraft.id}&petId=${activeDraft.pet_id}`)}
+              className="btn btn-sm btn-primary"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 18px', fontWeight: 700 }}
+            >
+              Continue {pets.find((p) => p.id === activeDraft.pet_id)?.name ? `${pets.find((p) => p.id === activeDraft.pet_id).name}'s ` : ''}Assessment <ArrowRight size={15} />
+            </button>
+          </div>
+        </div>
+      )}
 
       {error && <ErrorMessage message={error} />}
 
@@ -203,10 +291,10 @@ export const DashboardPage = () => {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
           <div>
             <h2 style={{ fontSize: '20px', fontWeight: '700', color: 'var(--text-main)' }}>
-              Your Pet Profiles
+              Your Pets
             </h2>
             <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-              Select a pet to launch an assessment or view history
+              Select a pet to launch an assessment or view profile history
             </p>
           </div>
           <Link to="/pets" className="btn btn-sm btn-outline-primary">
@@ -244,20 +332,20 @@ export const DashboardPage = () => {
                     </div>
                     <div>
                       <h3 style={{ fontSize: '17px', fontWeight: '700', color: 'var(--text-main)', margin: 0 }}>
-                        {pet.name}
+                        {pet.name} — {pet.species}
                       </h3>
                       <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-                        {pet.species} • {pet.breed || 'Mixed'}
+                        {pet.breed || 'Mixed Breed'}
                       </span>
                     </div>
                   </div>
                   <span className="badge badge-neutral">
-                    {pet.sex || 'Unknown'}
+                    {pet.spayed_neutered ? 'Spayed/Neutered' : (pet.sex || 'Unknown')}
                   </span>
                 </div>
 
                 <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '18px', display: 'flex', gap: '16px' }}>
-                  <span>Weight: <strong>{pet.weight ? `${pet.weight} kg` : 'N/A'}</strong></span>
+                  <span>Weight: <strong>{pet.weight ? `${pet.weight} ${pet.weight_unit || 'kg'}` : 'Unrecorded'}</strong></span>
                   <span>Age: <strong>{pet.age ? `${pet.age} yrs` : 'Unknown'}</strong></span>
                 </div>
 
@@ -356,7 +444,13 @@ export const DashboardPage = () => {
                       </td>
                       <td style={{ padding: '14px 20px', textAlign: 'right' }}>
                         <button
-                          onClick={() => navigate(`/assessments/new?resume_id=${a.id}`)}
+                          onClick={() => {
+                            if (isCompleted) {
+                              navigate(a.report_id ? `/reports/${a.report_id}` : `/reports`);
+                            } else {
+                              navigate(`/assessments/new?resumeId=${a.id}&petId=${a.pet_id}`);
+                            }
+                          }}
                           className="btn btn-sm btn-outline-primary"
                         >
                           {isCompleted ? 'View Report' : 'Continue Intake'}
@@ -370,6 +464,212 @@ export const DashboardPage = () => {
             </table>
           </div>
         )}
+      </section>
+
+      {/* Dedicated Premium AI Chatbot Studio Showcase */}
+      <section style={{ marginTop: '40px' }}>
+        <div style={{
+          background: 'linear-gradient(135deg, #042f2e 0%, #115e59 45%, #0f766e 100%)',
+          borderRadius: 'var(--radius-xl)',
+          padding: '36px 32px',
+          color: '#ffffff',
+          boxShadow: '0 16px 36px -10px rgba(13, 148, 136, 0.35)',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '28px',
+          position: 'relative',
+          overflow: 'hidden'
+        }}>
+          {/* Ambient background glow */}
+          <div style={{
+            position: 'absolute',
+            top: '-60px',
+            right: '-40px',
+            width: '240px',
+            height: '240px',
+            borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(45, 212, 191, 0.25) 0%, transparent 70%)',
+            pointerEvents: 'none'
+          }} />
+
+          <div style={{ maxWidth: '640px', zIndex: 1 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+              <span style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                padding: '4px 10px',
+                borderRadius: 'var(--radius-full)',
+                backgroundColor: 'rgba(255, 255, 255, 0.15)',
+                backdropFilter: 'blur(8px)',
+                fontSize: '11px',
+                fontWeight: '800',
+                letterSpacing: '0.06em',
+                textTransform: 'uppercase',
+                color: '#99f6e4'
+              }}>
+                <Sparkles size={13} color="#5eead4" /> Premium AI Chatbot Space
+              </span>
+              <span style={{
+                fontSize: '11px',
+                fontWeight: '700',
+                backgroundColor: '#ccfbf1',
+                color: '#0f766e',
+                padding: '2px 8px',
+                borderRadius: '8px'
+              }}>
+                PRO ACTIVE
+              </span>
+            </div>
+
+            <h2 style={{ fontSize: '24px', fontWeight: '800', margin: '0 0 10px 0', letterSpacing: '-0.02em', color: '#ffffff' }}>
+              VetVision AI Assistant &bull; Dedicated Chatroom
+            </h2>
+
+            <p style={{ fontSize: '14px', lineHeight: 1.6, color: '#ccfbf1', margin: '0 0 16px 0' }}>
+              Switch patients on-the-fly, consult our fine-tuned veterinary reasoning model without asterisks, and review strict AAHA/ASPCA clinical safety alerts in a distraction-free environment.
+            </p>
+
+            {/* Quick Prompt Starters that jump right in */}
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              {[
+                'My dog ate chocolate or grapes',
+                'Cat wheezing or persistent cough',
+                'What normal puppy fever looks like',
+                'Safe at-home hydration tricks'
+              ].map((prompt, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => navigate(`/assistant?q=${encodeURIComponent(prompt)}`)}
+                  style={{
+                    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                    color: '#ffffff',
+                    padding: '6px 12px',
+                    borderRadius: 'var(--radius-full)',
+                    fontSize: '12px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.22)';
+                    e.currentTarget.style.transform = 'translateY(-1px)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.12)';
+                    e.currentTarget.style.transform = 'translateY(0)';
+                  }}
+                >
+                  <MessageSquare size={12} color="#5eead4" />
+                  <span>{prompt}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', zIndex: 1, minWidth: '220px' }}>
+            <Link
+              to="/assistant"
+              className="btn btn-lg"
+              style={{
+                backgroundColor: '#ffffff',
+                color: '#0f766e',
+                fontWeight: '800',
+                boxShadow: '0 4px 14px rgba(0, 0, 0, 0.15)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                padding: '14px 24px',
+                borderRadius: 'var(--radius-lg)'
+              }}
+            >
+              <Bot size={20} color="#0d9488" />
+              <span>Launch AI Assistant</span>
+              <ArrowRight size={18} />
+            </Link>
+
+            <span style={{ fontSize: '11px', textAlign: 'center', color: '#99f6e4', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+              ✓ Guardrails verified &bull; Plain text output
+            </span>
+          </div>
+        </div>
+      </section>
+
+      {/* Emergency Clinical Advice & Safety Guidance */}
+      <section style={{ marginTop: '40px' }}>
+        <div
+          style={{
+            backgroundColor: '#fff1f2',
+            border: '1px solid #fecdd3',
+            borderRadius: 'var(--radius-xl)',
+            padding: '24px 28px',
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: '18px',
+          }}
+        >
+          <div
+            style={{
+              width: '44px',
+              height: '44px',
+              borderRadius: '12px',
+              backgroundColor: '#ffe4e6',
+              color: '#e11d48',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+            }}
+          >
+            <ShieldAlert size={24} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
+              <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#9f1239', margin: 0 }}>
+                Clinical Safety & Red-Flag Triage Notice
+              </h3>
+              <span
+                style={{
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  backgroundColor: '#e11d48',
+                  color: 'white',
+                  padding: '2px 8px',
+                  borderRadius: 'var(--radius-full)',
+                  textTransform: 'uppercase',
+                }}
+              >
+                Immediate ER Care
+              </span>
+            </div>
+            <p style={{ fontSize: '13px', color: '#881337', lineHeight: 1.5, margin: '0 0 12px' }}>
+              VetVision AI assists in early symptom tracking and veterinary communication. If your pet exhibits any of the following critical indicators, <strong>do not wait for questionnaire results</strong> — transport them to an emergency veterinary clinic immediately:
+            </p>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                gap: '8px',
+                fontSize: '12px',
+                color: '#4c0519',
+              }}
+            >
+              <div>🚨 <strong>Severe respiratory distress</strong> or choking</div>
+              <div>🚨 <strong>Pale, blue, or white gums</strong></div>
+              <div>🚨 <strong>Loss of consciousness</strong> or acute collapse</div>
+              <div>🚨 <strong>Continuous seizures</strong> lasting &gt;3 minutes</div>
+              <div>🚨 <strong>Uncontrolled hemorrhage</strong> or major trauma</div>
+              <div>🚨 <strong>Suspected lethal toxin ingestion</strong> (chocolate, lilies, xylitol)</div>
+            </div>
+          </div>
+        </div>
       </section>
     </div>
   );

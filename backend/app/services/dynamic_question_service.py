@@ -296,18 +296,36 @@ class DynamicQuestionService:
 
         # Filter by symptom or category relevance
         if selected_symptom_ids or relevant_categories:
-            from sqlalchemy import or_
+            from sqlalchemy import or_, and_
             conditions = []
+            # 1. Questions specifically bound to the symptoms reported by the owner
             if selected_symptom_ids:
                 conditions.append(FollowUpQuestion.symptom_id.in_(selected_symptom_ids))
+            # 2. Category-level general questions (questions with no single symptom_id binding)
             if relevant_categories:
-                conditions.append(FollowUpQuestion.category.in_(relevant_categories))
-            # Also include questions with no category/symptom binding (universal)
+                conditions.append(
+                    and_(
+                        FollowUpQuestion.category.in_(relevant_categories),
+                        FollowUpQuestion.symptom_id == None,
+                    )
+                )
+            # 3. Also include universal questions with no category/symptom binding
             conditions.append(
-                (FollowUpQuestion.symptom_id == None) &  # noqa: E711
-                (FollowUpQuestion.category == None)
+                and_(
+                    FollowUpQuestion.symptom_id == None,
+                    FollowUpQuestion.category == None,
+                )
             )
             query = query.filter(or_(*conditions))
+        else:
+            # If no symptoms are selected yet, only show universal general intake questions
+            from sqlalchemy import and_
+            query = query.filter(
+                and_(
+                    FollowUpQuestion.symptom_id == None,
+                    FollowUpQuestion.category == None,
+                )
+            )
         
         # Species filter: include questions with no species restriction OR matching species
         if pet_species:
@@ -336,8 +354,16 @@ class DynamicQuestionService:
                 )
             )
 
-        # Priority sort: emergency first, then high, medium, low, then display_order
+        # Priority sort:
+        # First: Questions directly matching reported symptom_id (0) vs general/universal (1)
+        # Second: Emergency priority (0), High (1), Medium (2), Low (3)
+        # Third: Display order
         from sqlalchemy import case
+        symptom_match_case = case(
+            (FollowUpQuestion.symptom_id.in_(selected_symptom_ids), 0),
+            else_=1,
+        ) if selected_symptom_ids else None
+
         priority_case = case(
             {
                 FollowUpQuestion.PRIORITY_EMERGENCY: 0,
@@ -348,7 +374,10 @@ class DynamicQuestionService:
             value=FollowUpQuestion.priority,
             else_=4,
         )
-        query = query.order_by(priority_case, FollowUpQuestion.display_order.asc())
+        if symptom_match_case is not None:
+            query = query.order_by(symptom_match_case, priority_case, FollowUpQuestion.display_order.asc())
+        else:
+            query = query.order_by(priority_case, FollowUpQuestion.display_order.asc())
 
         return query.all()
 

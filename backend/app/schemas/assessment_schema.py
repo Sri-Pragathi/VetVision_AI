@@ -212,6 +212,8 @@ class HealthAssessmentResponseSchema(Schema):
     id = fields.String()
     pet_id = fields.String()
     status = fields.String()
+    current_step = fields.Integer(dump_default=1)
+    draft_data = fields.Dict(allow_none=True)
     started_at = fields.DateTime()
     completed_at = fields.DateTime()
     created_at = fields.DateTime()

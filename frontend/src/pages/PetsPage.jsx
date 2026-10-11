@@ -38,10 +38,16 @@ export const PetsPage = () => {
     sex: 'Male Neutered',
     date_of_birth: '',
     weight: '',
+    weight_unit: 'kg',
+    photo_url: '',
+    spayed_neutered: false,
     allergies: '',
     existing_conditions: '',
+    medical_history: '',
+    vaccination_history: '',
     current_medications: '',
     vaccination_status: 'Up to date',
+    notes: '',
   });
 
   const fetchPets = async () => {
@@ -71,10 +77,16 @@ export const PetsPage = () => {
       sex: 'Male Neutered',
       date_of_birth: '',
       weight: '',
+      weight_unit: 'kg',
+      photo_url: '',
+      spayed_neutered: false,
       allergies: '',
       existing_conditions: '',
+      medical_history: '',
+      vaccination_history: '',
       current_medications: '',
       vaccination_status: 'Up to date',
+      notes: '',
     });
     setIsModalOpen(true);
   };
@@ -82,6 +94,10 @@ export const PetsPage = () => {
   const openEditModal = (pet) => {
     setEditingPet(pet);
     const isStandardSpecies = DAILY_LIFE_SPECIES.some((s) => s.value.toLowerCase() === (pet.species || '').toLowerCase());
+    const isNeutered = pet.spayed_neutered != null
+      ? Boolean(pet.spayed_neutered)
+      : (pet.sex ? pet.sex.toLowerCase().includes('neutered') || pet.sex.toLowerCase().includes('spayed') : false);
+
     setFormData({
       name: pet.name || '',
       species: isStandardSpecies ? pet.species : 'Other',
@@ -90,10 +106,16 @@ export const PetsPage = () => {
       sex: pet.sex || 'Male Neutered',
       date_of_birth: pet.date_of_birth || '',
       weight: pet.weight ? String(pet.weight) : '',
+      weight_unit: pet.weight_unit || 'kg',
+      photo_url: pet.photo_url || '',
+      spayed_neutered: isNeutered,
       allergies: pet.allergies || '',
       existing_conditions: pet.existing_conditions || '',
+      medical_history: pet.medical_history || '',
+      vaccination_history: pet.vaccination_history || '',
       current_medications: pet.current_medications || '',
       vaccination_status: pet.vaccination_status || 'Up to date',
+      notes: pet.notes || '',
     });
     setIsModalOpen(true);
   };
@@ -115,10 +137,16 @@ export const PetsPage = () => {
       sex: formData.sex || null,
       date_of_birth: formData.date_of_birth && formData.date_of_birth.trim() ? formData.date_of_birth.trim() : null,
       weight: formData.weight && !isNaN(parseFloat(formData.weight)) ? parseFloat(formData.weight) : null,
+      weight_unit: formData.weight_unit || 'kg',
+      photo_url: formData.photo_url?.trim() ? formData.photo_url.trim() : null,
+      spayed_neutered: Boolean(formData.spayed_neutered),
       allergies: formData.allergies?.trim() ? formData.allergies.trim() : null,
       existing_conditions: formData.existing_conditions?.trim() ? formData.existing_conditions.trim() : null,
+      medical_history: formData.medical_history?.trim() ? formData.medical_history.trim() : null,
+      vaccination_history: formData.vaccination_history?.trim() ? formData.vaccination_history.trim() : null,
       current_medications: formData.current_medications?.trim() ? formData.current_medications.trim() : null,
       vaccination_status: formData.vaccination_status?.trim() ? formData.vaccination_status.trim() : null,
+      notes: formData.notes?.trim() ? formData.notes.trim() : null,
     };
 
     try {
@@ -243,15 +271,16 @@ export const PetsPage = () => {
                 gap: '8px',
               }}>
                 <div><span style={{ color: 'var(--text-muted)' }}>Sex:</span> <strong>{pet.sex || 'Unknown'}</strong></div>
-                <div><span style={{ color: 'var(--text-muted)' }}>Weight:</span> <strong>{pet.weight ? `${pet.weight} kg` : 'Unrecorded'}</strong></div>
+                <div><span style={{ color: 'var(--text-muted)' }}>Weight:</span> <strong>{pet.weight ? `${pet.weight} ${pet.weight_unit || 'kg'}` : 'Unrecorded'}</strong></div>
                 <div><span style={{ color: 'var(--text-muted)' }}>Age:</span> <strong>{pet.age ? `${pet.age} years` : 'Unknown'}</strong></div>
-                <div><span style={{ color: 'var(--text-muted)' }}>Vaccines:</span> <strong>{pet.vaccination_status || 'Unrecorded'}</strong></div>
+                <div><span style={{ color: 'var(--text-muted)' }}>Status:</span> <strong>{pet.spayed_neutered ? 'Neutered / Spayed' : (pet.spayed_neutered === false ? 'Intact' : (pet.vaccination_status || 'Unrecorded'))}</strong></div>
               </div>
 
-              {(pet.allergies || pet.existing_conditions) && (
-                <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '16px' }}>
+              {(pet.allergies || pet.existing_conditions || pet.medical_history) && (
+                <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '16px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   {pet.allergies && <div>Allergies: <span style={{ color: '#b45309' }}>{pet.allergies}</span></div>}
                   {pet.existing_conditions && <div>Conditions: <span style={{ color: 'var(--text-main)' }}>{pet.existing_conditions}</span></div>}
+                  {pet.medical_history && <div>History: <span style={{ color: 'var(--text-main)' }}>{pet.medical_history}</span></div>}
                 </div>
               )}
 
@@ -344,7 +373,7 @@ export const PetsPage = () => {
             </div>
 
             <div className="form-group">
-              <label className="form-label" htmlFor="pet-sex">Sex / Reproductive Status</label>
+              <label className="form-label" htmlFor="pet-sex">Sex</label>
               <select
                 id="pet-sex"
                 className="form-select"
@@ -373,18 +402,54 @@ export const PetsPage = () => {
             </div>
 
             <div className="form-group">
-              <label className="form-label" htmlFor="pet-weight">Weight (kg)</label>
-              <input
-                id="pet-weight"
-                type="number"
-                step="0.1"
-                min="0.1"
-                className="form-input"
-                placeholder="e.g. 14.5"
-                value={formData.weight}
-                onChange={(e) => setFormData({ ...formData, weight: e.target.value })}
-              />
+              <label className="form-label" htmlFor="pet-weight">Weight & Unit</label>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input
+                  id="pet-weight"
+                  type="number"
+                  step="0.1"
+                  min="0.1"
+                  className="form-input"
+                  placeholder="e.g. 14.5"
+                  value={formData.weight}
+                  onChange={(e) => setFormData({ ...formData, weight: e.target.value })}
+                  style={{ flex: 1 }}
+                />
+                <select
+                  id="pet-weight-unit"
+                  className="form-select"
+                  value={formData.weight_unit}
+                  onChange={(e) => setFormData({ ...formData, weight_unit: e.target.value })}
+                  style={{ width: '90px' }}
+                >
+                  <option value="kg">kg</option>
+                  <option value="lbs">lbs</option>
+                </select>
+              </div>
             </div>
+          </div>
+
+          <div className="form-group" style={{ marginBottom: '16px' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>
+              <input
+                type="checkbox"
+                checked={Boolean(formData.spayed_neutered)}
+                onChange={(e) => setFormData({ ...formData, spayed_neutered: e.target.checked })}
+              />
+              Spayed or Neutered
+            </label>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label" htmlFor="pet-photo">Pet Photo URL (optional)</label>
+            <input
+              id="pet-photo"
+              type="url"
+              className="form-input"
+              placeholder="https://images.example.com/pet.jpg"
+              value={formData.photo_url}
+              onChange={(e) => setFormData({ ...formData, photo_url: e.target.value })}
+            />
           </div>
 
           <div className="form-group">
@@ -411,6 +476,32 @@ export const PetsPage = () => {
             />
           </div>
 
+          <div className="grid-2">
+            <div className="form-group">
+              <label className="form-label" htmlFor="pet-medical-history">Medical & Surgery History</label>
+              <textarea
+                id="pet-medical-history"
+                className="form-input"
+                rows={2}
+                placeholder="Past surgeries, hospitalizations, or chronic treatments"
+                value={formData.medical_history}
+                onChange={(e) => setFormData({ ...formData, medical_history: e.target.value })}
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label" htmlFor="pet-vaccine-history">Vaccination Records / History</label>
+              <textarea
+                id="pet-vaccine-history"
+                className="form-input"
+                rows={2}
+                placeholder="Rabies (2025), DHPP, Bordetella, etc."
+                value={formData.vaccination_history}
+                onChange={(e) => setFormData({ ...formData, vaccination_history: e.target.value })}
+              />
+            </div>
+          </div>
+
           <div className="form-group">
             <label className="form-label" htmlFor="pet-meds">Current Medications & Dosages</label>
             <input
@@ -420,6 +511,18 @@ export const PetsPage = () => {
               placeholder="e.g. Glucosamine daily, Apoquel 16mg"
               value={formData.current_medications}
               onChange={(e) => setFormData({ ...formData, current_medications: e.target.value })}
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label" htmlFor="pet-notes">General Notes / Care Instructions</label>
+            <textarea
+              id="pet-notes"
+              className="form-input"
+              rows={2}
+              placeholder="Dietary preferences, temperament with vets, microchip number, etc."
+              value={formData.notes}
+              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
             />
           </div>
 

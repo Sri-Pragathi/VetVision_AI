@@ -41,4 +41,13 @@ export const assessmentApi = {
     const res = await apiClient.get(`/assessments/${assessmentId}/ai-data`);
     return res.data;
   },
+  saveDraft: async (assessmentId, draftPayload) => {
+    const res = await apiClient.put(`/assessments/${assessmentId}/draft`, draftPayload);
+    return res.data;
+  },
+  getActiveDraft: async (petId) => {
+    const params = petId ? { pet_id: petId } : {};
+    const res = await apiClient.get('/assessments/active-draft', { params });
+    return res.data;
+  },
 };

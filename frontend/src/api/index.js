@@ -7,3 +7,4 @@ export * from './questionApi';
 export * from './imageApi';
 export * from './riskApi';
 export * from './reportApi';
+export * from './guidanceApi';

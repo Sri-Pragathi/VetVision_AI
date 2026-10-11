@@ -107,6 +107,7 @@ class AssessmentImage(db.Model):
             "processing_status": self.processing_status,
             "analysis_status": self.analysis_status,
             "quality_gate": self.quality_gate,
+            "image_url": f"/api/v1/assessment-images/{self.id}/file",
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }

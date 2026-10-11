@@ -270,6 +270,16 @@ def test_complete_16_step_happy_path_user_journey(client):
     assert rep_body["image_analysis"][0]["status"] == "COMPLETED"
     assert "definitive veterinary diagnosis" in rep_body["disclaimer"]
 
+    # Verify AI Pet Care Guide in report snapshot
+    assert "immediate_care_guide" in rep_body
+    care_guide = rep_body["immediate_care_guide"]
+    assert "section_a_what_to_do_now" in care_guide or "what_to_do_now" in care_guide
+    assert "section_b_what_to_avoid" in care_guide or "what_not_to_do" in care_guide
+    assert "section_c_what_to_monitor" in care_guide or "what_to_monitor" in care_guide
+    assert "section_d_when_to_seek_care" in care_guide or "when_to_seek_care" in care_guide
+    assert "section_e_why_shown" in care_guide or "why_guidance_shown" in care_guide
+    assert "emergency_after_hours" in care_guide or "emergency_contacts" in care_guide
+
     # -------------------------------------------------------------------------
     # STEP 15: Copy Veterinary Handoff Summary & Use Print-Friendly HTML View
     # -------------------------------------------------------------------------
@@ -285,6 +295,10 @@ def test_complete_16_step_happy_path_user_journey(client):
     assert "Veterinary Health Assessment Report" in html_content
     assert "Bella" in html_content
     assert "Golden Retriever" in html_content
+    assert "AI Pet Care Guide" in html_content
+    assert "What to Do Now" in html_content
+    assert "What NOT to Do" in html_content
+    assert "ASPCA Animal Poison Control Center" in html_content
     assert "@media print" in html_content  # Print-friendly stylesheet
 
     # -------------------------------------------------------------------------
@@ -496,3 +510,37 @@ def test_report_snapshot_immutability_and_xss_escaping(client, registered_user, 
     html_text = html_res.get_data(as_text=True)
     assert "<script>alert('xss')</script>" not in html_text
     assert "&lt;script&gt;" in html_text
+
+
+def test_owner_interactive_guidance_assistant_and_doctor_route_removal(client, registered_user, test_assessment):
+    """Verify that Ask VetVision AI is active and legacy doctor portal routes are removed."""
+    headers = registered_user["headers"]
+    pet_id = test_assessment["pet_id"]
+    assessment_id = test_assessment["id"]
+
+    # 1. Quick questions available
+    q_res = client.get("/api/v1/guidance/quick-questions", headers=headers)
+    assert q_res.status_code == 200
+    questions = q_res.get_json()["data"]["questions"]
+    assert len(questions) >= 5
+
+    # 2. Ask assistant about midnight closed clinic
+    ask_res = client.post(
+        "/api/v1/guidance/ask",
+        headers=headers,
+        json={
+            "pet_id": pet_id,
+            "assessment_id": assessment_id,
+            "question": "It is midnight and my regular clinic is closed. What should I do first?",
+        },
+    )
+    assert ask_res.status_code == 200
+    data = ask_res.get_json()["data"]
+    assert len(data["answer"]) > 50
+    assert ("gum color" in data["answer"].lower() or "emergency" in data["answer"].lower() or "clinic" in data["answer"].lower())
+    assert "emergency_contacts" in data
+    assert "aspca_poison_control" in data["emergency_contacts"]
+
+    # 3. Verify doctor routes return 404 (doctor blueprint unregistered)
+    doc_res = client.get("/api/v1/doctor/cases", headers=headers)
+    assert doc_res.status_code == 404

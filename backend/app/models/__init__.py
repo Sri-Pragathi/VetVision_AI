@@ -17,6 +17,8 @@ from app.models.risk_analysis import AssessmentRiskAnalysis
 from app.models.assessment_image import AssessmentImage, ImageObservation
 # Step 6: Veterinary Report & Explainable Health Summary
 from app.models.assessment_report import AssessmentReport
+# Doctor Review & Clinical Triage Override
+from app.models.doctor_review import DoctorReview
 
 __all__ = [
     "User",
@@ -41,4 +43,6 @@ __all__ = [
     "ImageObservation",
     # Step 6
     "AssessmentReport",
+    # Doctor Review
+    "DoctorReview",
 ]

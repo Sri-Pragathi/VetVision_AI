@@ -15,6 +15,7 @@ import {
   Clock,
   ChevronRight,
   ShieldAlert,
+  Camera,
 } from 'lucide-react';
 import { petApi } from '../api/petApi';
 import TriageBadge from '../components/common/TriageBadge';
@@ -58,16 +59,29 @@ export default function PetDetailPage() {
       const petData = petRes.data || petRes;
       setPet(petData);
       setAssessments(assessRes.data || assessRes || []);
+      const isNeutered = petData.spayed_neutered != null
+        ? Boolean(petData.spayed_neutered)
+        : (petData.is_neutered != null ? Boolean(petData.is_neutered) : (petData.sex ? petData.sex.toLowerCase().includes('neutered') || petData.sex.toLowerCase().includes('spayed') : false));
+
       setEditFormData({
         name: petData.name || '',
-        species: petData.species || 'dog',
+        species: petData.species || 'Dog',
+        custom_species: '',
         breed: petData.breed || '',
-        age_years: petData.age_years || '',
-        weight_kg: petData.weight_kg || '',
-        gender: petData.gender || 'unknown',
-        is_neutered: Boolean(petData.is_neutered),
-        known_allergies: petData.known_allergies || '',
-        chronic_conditions: petData.chronic_conditions || '',
+        age_years: petData.age != null ? String(petData.age) : (petData.age_years != null ? String(petData.age_years) : ''),
+        date_of_birth: petData.date_of_birth || '',
+        weight: petData.weight != null ? String(petData.weight) : (petData.weight_kg != null ? String(petData.weight_kg) : ''),
+        weight_unit: petData.weight_unit || 'kg',
+        gender: petData.sex || petData.gender || 'unknown',
+        is_neutered: isNeutered,
+        photo_url: petData.photo_url || '',
+        known_allergies: petData.allergies || petData.known_allergies || '',
+        chronic_conditions: petData.existing_conditions || petData.chronic_conditions || '',
+        medical_history: petData.medical_history || '',
+        vaccination_history: petData.vaccination_history || '',
+        notes: petData.notes || '',
+        vaccination_status: petData.vaccination_status || 'Up to date',
+        current_medications: petData.current_medications || '',
       });
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to load pet details. Please try again.');
@@ -86,19 +100,27 @@ export default function PetDetailPage() {
           ? editFormData.custom_species.trim()
           : (editFormData.species || 'Dog');
 
+      const parsedWeight = editFormData.weight && !isNaN(parseFloat(editFormData.weight))
+        ? parseFloat(editFormData.weight)
+        : (editFormData.weight_kg && !isNaN(parseFloat(editFormData.weight_kg)) ? parseFloat(editFormData.weight_kg) : null);
+
       const payload = {
         name: editFormData.name ? editFormData.name.trim() : '',
         species: finalSpecies,
         breed: editFormData.breed?.trim() ? editFormData.breed.trim() : null,
         sex: editFormData.sex || editFormData.gender || null,
         date_of_birth: editFormData.date_of_birth?.trim() ? editFormData.date_of_birth.trim() : null,
-        weight: editFormData.weight && !isNaN(parseFloat(editFormData.weight))
-          ? parseFloat(editFormData.weight)
-          : (editFormData.weight_kg && !isNaN(parseFloat(editFormData.weight_kg)) ? parseFloat(editFormData.weight_kg) : null),
+        weight: parsedWeight,
+        weight_unit: editFormData.weight_unit || 'kg',
+        photo_url: editFormData.photo_url?.trim() ? editFormData.photo_url.trim() : null,
+        spayed_neutered: Boolean(editFormData.is_neutered),
         allergies: editFormData.allergies?.trim() || editFormData.known_allergies?.trim() || null,
         existing_conditions: editFormData.existing_conditions?.trim() || editFormData.chronic_conditions?.trim() || null,
+        medical_history: editFormData.medical_history?.trim() ? editFormData.medical_history.trim() : null,
+        vaccination_history: editFormData.vaccination_history?.trim() ? editFormData.vaccination_history.trim() : null,
         current_medications: editFormData.current_medications?.trim() || null,
         vaccination_status: editFormData.vaccination_status?.trim() || null,
+        notes: editFormData.notes?.trim() ? editFormData.notes.trim() : null,
       };
       const res = await petApi.updatePet(id, payload);
       setPet(res.data || res);
@@ -107,6 +129,23 @@ export default function PetDetailPage() {
       setEditError(err.response?.data?.message || err.message || 'Failed to update pet.');
     } finally {
       setSavingEdit(false);
+    }
+  };
+
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+
+  const handleAvatarUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file || !id) return;
+    try {
+      setUploadingAvatar(true);
+      const res = await petApi.uploadAvatar(id, file);
+      const updated = res.data || res;
+      setPet(updated);
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to upload pet avatar.');
+    } finally {
+      setUploadingAvatar(false);
     }
   };
 
@@ -180,20 +219,61 @@ export default function PetDetailPage() {
         <div className="card" style={{ padding: '2rem', marginBottom: '2rem', background: 'linear-gradient(135deg, white, var(--color-surface))' }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1.5rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
-              <div
-                style={{
-                  width: '80px',
-                  height: '80px',
-                  borderRadius: '20px',
-                  backgroundColor: 'var(--color-primary-light)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '2.5rem',
-                  boxShadow: 'var(--shadow-sm)',
-                }}
-              >
-                {speciesEmoji}
+              <div style={{ position: 'relative' }}>
+                <div
+                  style={{
+                    width: '80px',
+                    height: '80px',
+                    borderRadius: '20px',
+                    backgroundColor: 'var(--color-primary-light)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '2.5rem',
+                    boxShadow: 'var(--shadow-sm)',
+                    overflow: 'hidden',
+                  }}
+                >
+                  {pet.photo_url ? (
+                    <img
+                      src={pet.photo_url}
+                      alt={pet.name}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    />
+                  ) : (
+                    speciesEmoji
+                  )}
+                </div>
+                <label
+                  htmlFor="pet-avatar-upload"
+                  style={{
+                    position: 'absolute',
+                    bottom: '-4px',
+                    right: '-4px',
+                    width: '28px',
+                    height: '28px',
+                    borderRadius: '50%',
+                    backgroundColor: 'var(--color-primary)',
+                    color: 'white',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: uploadingAvatar ? 'wait' : 'pointer',
+                    boxShadow: 'var(--shadow-md)',
+                    border: '2px solid white',
+                  }}
+                  title="Upload Pet Photo"
+                >
+                  <Camera size={14} />
+                </label>
+                <input
+                  id="pet-avatar-upload"
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  style={{ display: 'none' }}
+                  onChange={handleAvatarUpload}
+                  disabled={uploadingAvatar}
+                />
               </div>
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.25rem' }}>
@@ -215,7 +295,7 @@ export default function PetDetailPage() {
                   </span>
                 </div>
                 <p style={{ color: 'var(--color-text-muted)', margin: 0, fontSize: '0.95rem' }}>
-                  {pet.breed || 'Mixed Breed'} • {pet.gender ? pet.gender.toUpperCase() : 'UNKNOWN'} • {pet.is_neutered ? 'Neutered/Spayed' : 'Intact'}
+                  {pet.breed || 'Mixed Breed'} • {pet.sex || pet.gender ? (pet.sex || pet.gender) : 'Unknown Sex'} • {pet.spayed_neutered != null ? (pet.spayed_neutered ? 'Neutered/Spayed' : 'Intact') : (pet.is_neutered ? 'Neutered/Spayed' : 'Intact')}
                 </p>
               </div>
             </div>
@@ -248,7 +328,7 @@ export default function PetDetailPage() {
               <div>
                 <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>Age</div>
                 <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>
-                  {pet.age_years != null ? `${pet.age_years} yrs` : 'Not recorded'}
+                  {pet.age != null ? `${pet.age} yrs` : (pet.age_years != null ? `${pet.age_years} yrs` : 'Not recorded')}
                 </div>
               </div>
             </div>
@@ -260,7 +340,7 @@ export default function PetDetailPage() {
               <div>
                 <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>Weight</div>
                 <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>
-                  {pet.weight_kg != null ? `${pet.weight_kg} kg` : 'Not recorded'}
+                  {pet.weight != null ? `${pet.weight} ${pet.weight_unit || 'kg'}` : (pet.weight_kg != null ? `${pet.weight_kg} kg` : 'Not recorded')}
                 </div>
               </div>
             </div>
@@ -272,7 +352,7 @@ export default function PetDetailPage() {
               <div>
                 <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>Allergies</div>
                 <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>
-                  {pet.known_allergies || 'None recorded'}
+                  {pet.allergies || pet.known_allergies || 'None recorded'}
                 </div>
               </div>
             </div>
@@ -290,7 +370,7 @@ export default function PetDetailPage() {
             </div>
           </div>
 
-          {pet.chronic_conditions && (
+          {(pet.existing_conditions || pet.chronic_conditions) && (
             <div
               style={{
                 marginTop: '1.25rem',
@@ -302,7 +382,55 @@ export default function PetDetailPage() {
                 color: 'var(--color-text-main)',
               }}
             >
-              <strong>Chronic Conditions / Medical Notes:</strong> {pet.chronic_conditions}
+              <strong>Chronic Conditions / Clinical Notes:</strong> {pet.existing_conditions || pet.chronic_conditions}
+            </div>
+          )}
+
+          {pet.medical_history && (
+            <div
+              style={{
+                marginTop: '0.75rem',
+                padding: '0.75rem 1rem',
+                borderRadius: 'var(--radius-md)',
+                backgroundColor: 'rgba(59, 130, 246, 0.08)',
+                border: '1px solid rgba(59, 130, 246, 0.2)',
+                fontSize: '0.875rem',
+                color: 'var(--color-text-main)',
+              }}
+            >
+              <strong>Past Medical & Surgery History:</strong> {pet.medical_history}
+            </div>
+          )}
+
+          {pet.vaccination_history && (
+            <div
+              style={{
+                marginTop: '0.75rem',
+                padding: '0.75rem 1rem',
+                borderRadius: 'var(--radius-md)',
+                backgroundColor: 'rgba(16, 185, 129, 0.08)',
+                border: '1px solid rgba(16, 185, 129, 0.2)',
+                fontSize: '0.875rem',
+                color: 'var(--color-text-main)',
+              }}
+            >
+              <strong>Vaccination History:</strong> {pet.vaccination_history}
+            </div>
+          )}
+
+          {pet.notes && (
+            <div
+              style={{
+                marginTop: '0.75rem',
+                padding: '0.75rem 1rem',
+                borderRadius: 'var(--radius-md)',
+                backgroundColor: 'var(--color-surface)',
+                border: '1px solid var(--color-border)',
+                fontSize: '0.875rem',
+                color: 'var(--color-text-main)',
+              }}
+            >
+              <strong>General Notes & Care Instructions:</strong> {pet.notes}
             </div>
           )}
         </div>
@@ -490,35 +618,52 @@ export default function PetDetailPage() {
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
             <div>
-              <label className="form-label">Age (Years)</label>
+              <label className="form-label">Date of Birth</label>
               <input
-                type="number"
-                step="0.1"
+                type="date"
                 className="form-input"
-                value={editFormData.age_years || ''}
-                onChange={(e) => setEditFormData({ ...editFormData, age_years: e.target.value })}
+                value={editFormData.date_of_birth || ''}
+                onChange={(e) => setEditFormData({ ...editFormData, date_of_birth: e.target.value })}
               />
             </div>
             <div>
-              <label className="form-label">Weight (kg)</label>
-              <input
-                type="number"
-                step="0.1"
-                className="form-input"
-                value={editFormData.weight_kg || ''}
-                onChange={(e) => setEditFormData({ ...editFormData, weight_kg: e.target.value })}
-              />
+              <label className="form-label">Weight & Unit</label>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input
+                  type="number"
+                  step="0.1"
+                  min="0.1"
+                  className="form-input"
+                  placeholder="e.g. 14.5"
+                  value={editFormData.weight || editFormData.weight_kg || ''}
+                  onChange={(e) => setEditFormData({ ...editFormData, weight: e.target.value, weight_kg: e.target.value })}
+                  style={{ flex: 1 }}
+                />
+                <select
+                  className="form-input"
+                  value={editFormData.weight_unit || 'kg'}
+                  onChange={(e) => setEditFormData({ ...editFormData, weight_unit: e.target.value })}
+                  style={{ width: '90px' }}
+                >
+                  <option value="kg">kg</option>
+                  <option value="lbs">lbs</option>
+                </select>
+              </div>
             </div>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
             <div>
-              <label className="form-label">Gender</label>
+              <label className="form-label">Gender / Sex</label>
               <select
                 className="form-input"
-                value={editFormData.gender || 'unknown'}
-                onChange={(e) => setEditFormData({ ...editFormData, gender: e.target.value })}
+                value={editFormData.sex || editFormData.gender || 'unknown'}
+                onChange={(e) => setEditFormData({ ...editFormData, sex: e.target.value, gender: e.target.value })}
               >
+                <option value="Male Neutered">Male (Neutered)</option>
+                <option value="Male Intact">Male (Intact)</option>
+                <option value="Female Spayed">Female (Spayed)</option>
+                <option value="Female Intact">Female (Intact)</option>
                 <option value="male">Male</option>
                 <option value="female">Female</option>
                 <option value="unknown">Unknown</option>
@@ -537,24 +682,69 @@ export default function PetDetailPage() {
           </div>
 
           <div>
+            <label className="form-label">Pet Photo URL (optional)</label>
+            <input
+              type="url"
+              className="form-input"
+              placeholder="https://images.example.com/pet.jpg"
+              value={editFormData.photo_url || ''}
+              onChange={(e) => setEditFormData({ ...editFormData, photo_url: e.target.value })}
+            />
+          </div>
+
+          <div>
             <label className="form-label">Known Allergies</label>
             <input
               type="text"
               className="form-input"
               placeholder="e.g., Chicken, penicillin"
-              value={editFormData.known_allergies || ''}
-              onChange={(e) => setEditFormData({ ...editFormData, known_allergies: e.target.value })}
+              value={editFormData.known_allergies || editFormData.allergies || ''}
+              onChange={(e) => setEditFormData({ ...editFormData, known_allergies: e.target.value, allergies: e.target.value })}
             />
           </div>
 
           <div>
-            <label className="form-label">Chronic Conditions / History</label>
+            <label className="form-label">Chronic Conditions</label>
             <textarea
               className="form-input"
-              rows={3}
+              rows={2}
               placeholder="e.g., Mild arthritis, previous ear infections"
-              value={editFormData.chronic_conditions || ''}
-              onChange={(e) => setEditFormData({ ...editFormData, chronic_conditions: e.target.value })}
+              value={editFormData.chronic_conditions || editFormData.existing_conditions || ''}
+              onChange={(e) => setEditFormData({ ...editFormData, chronic_conditions: e.target.value, existing_conditions: e.target.value })}
+            />
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            <div>
+              <label className="form-label">Past Medical & Surgery History</label>
+              <textarea
+                className="form-input"
+                rows={2}
+                placeholder="Past surgeries, hospitalizations, or chronic treatments"
+                value={editFormData.medical_history || ''}
+                onChange={(e) => setEditFormData({ ...editFormData, medical_history: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="form-label">Vaccination History</label>
+              <textarea
+                className="form-input"
+                rows={2}
+                placeholder="Rabies (2025), DHPP, etc."
+                value={editFormData.vaccination_history || ''}
+                onChange={(e) => setEditFormData({ ...editFormData, vaccination_history: e.target.value })}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="form-label">General Notes & Instructions</label>
+            <textarea
+              className="form-input"
+              rows={2}
+              placeholder="Dietary preferences, temperament, microchip info, etc."
+              value={editFormData.notes || ''}
+              onChange={(e) => setEditFormData({ ...editFormData, notes: e.target.value })}
             />
           </div>
 

@@ -40,17 +40,25 @@ class ImageAnalysisService:
 
     @classmethod
     def _verify_image_ownership(cls, image_id: str, user_id: str) -> AssessmentImage:
-        """Verify image exists and belongs to an assessment owned by user."""
+        """Verify image exists and belongs to user's pet."""
         image = db.session.get(AssessmentImage, image_id)
         if not image:
             raise NotFoundException(f"Assessment image '{image_id}' not found.")
 
-        # Check ownership via attached pet
         assessment = image.assessment
         if not assessment or not assessment.pet or assessment.pet.owner_id != user_id:
             raise ForbiddenException("You do not have permission to access this assessment image.")
 
         return image
+
+    @classmethod
+    def get_image_file(cls, image_id: str, user_id: str) -> tuple[str, str]:
+        """Verify role-authorized access and return absolute path and MIME type."""
+        image = cls._verify_image_ownership(image_id, user_id)
+        abs_path = cls._default_storage.get_absolute_path(image.storage_path)
+        if not os.path.isfile(abs_path):
+            raise NotFoundException("Image file not found on storage.")
+        return abs_path, image.mime_type
 
     @classmethod
     def upload_assessment_image(

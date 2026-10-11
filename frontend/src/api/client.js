@@ -38,8 +38,11 @@ apiClient.interceptors.request.use(
 apiClient.interceptors.response.use(
   (response) => response.data,
   (error) => {
-    // If token has expired or is unauthorized, notify auth handler
-    if (error.response && error.response.status === 401) {
+    const url = error.config?.url || '';
+    const isAuthRoute = url.includes('/auth/logout') || url.includes('/auth/login') || url.includes('/auth/register');
+
+    // If token has expired or is unauthorized on a protected route, notify auth handler once
+    if (error.response && error.response.status === 401 && !isAuthRoute) {
       localStorage.removeItem('vetvision_access_token');
       localStorage.removeItem('vetvision_user');
       window.dispatchEvent(new Event('vetvision_auth_expired'));

@@ -76,6 +76,35 @@ class PetCreateSchema(Schema):
         allow_none=True,
         validate=validate.Length(max=50),
     )
+    weight_unit = fields.String(
+        required=False,
+        allow_none=True,
+        validate=validate.OneOf(["kg", "lbs"]),
+    )
+    photo_url = fields.String(
+        required=False,
+        allow_none=True,
+        validate=validate.Length(max=500),
+    )
+    spayed_neutered = fields.Boolean(
+        required=False,
+        allow_none=True,
+    )
+    vaccination_history = fields.String(
+        required=False,
+        allow_none=True,
+        validate=validate.Length(max=2000),
+    )
+    medical_history = fields.String(
+        required=False,
+        allow_none=True,
+        validate=validate.Length(max=2000),
+    )
+    notes = fields.String(
+        required=False,
+        allow_none=True,
+        validate=validate.Length(max=2000),
+    )
 
 
 class PetUpdateSchema(Schema):
@@ -122,6 +151,20 @@ class PetUpdateSchema(Schema):
         allow_none=True,
         validate=validate_weight,
     )
+    weight_unit = fields.String(
+        required=False,
+        allow_none=True,
+        validate=validate.OneOf(["kg", "lbs"]),
+    )
+    photo_url = fields.String(
+        required=False,
+        allow_none=True,
+        validate=validate.Length(max=500),
+    )
+    spayed_neutered = fields.Boolean(
+        required=False,
+        allow_none=True,
+    )
     allergies = fields.String(
         required=False,
         allow_none=True,
@@ -142,6 +185,21 @@ class PetUpdateSchema(Schema):
         allow_none=True,
         validate=validate.Length(max=50),
     )
+    vaccination_history = fields.String(
+        required=False,
+        allow_none=True,
+        validate=validate.Length(max=2000),
+    )
+    medical_history = fields.String(
+        required=False,
+        allow_none=True,
+        validate=validate.Length(max=2000),
+    )
+    notes = fields.String(
+        required=False,
+        allow_none=True,
+        validate=validate.Length(max=2000),
+    )
 
 
 class PetResponseSchema(Schema):
@@ -155,10 +213,16 @@ class PetResponseSchema(Schema):
     date_of_birth = fields.Date(dump_only=True)
     age = fields.Integer(dump_only=True)
     weight = fields.Float(dump_only=True)
+    weight_unit = fields.String(dump_only=True)
+    photo_url = fields.String(dump_only=True)
+    spayed_neutered = fields.Boolean(dump_only=True)
     allergies = fields.String(dump_only=True)
     existing_conditions = fields.String(dump_only=True)
     current_medications = fields.String(dump_only=True)
     vaccination_status = fields.String(dump_only=True)
+    vaccination_history = fields.String(dump_only=True)
+    medical_history = fields.String(dump_only=True)
+    notes = fields.String(dump_only=True)
     created_at = fields.DateTime(dump_only=True)
     updated_at = fields.DateTime(dump_only=True)
 

@@ -20,15 +20,18 @@ export const AuthProvider = ({ children }) => {
   const [isLoading, setIsLoading] = useState(true);
 
   const logout = useCallback(async () => {
-    try {
-      await authApi.logout();
-    } catch {
-      // Ignore network errors on logout
-    } finally {
-      localStorage.removeItem('vetvision_access_token');
-      localStorage.removeItem('vetvision_user');
-      setUser(null);
-      setAccessToken(null);
+    const token = localStorage.getItem('vetvision_access_token');
+    localStorage.removeItem('vetvision_access_token');
+    localStorage.removeItem('vetvision_user');
+    setUser(null);
+    setAccessToken(null);
+
+    if (token && token !== 'undefined' && token !== 'null') {
+      try {
+        await authApi.logout();
+      } catch {
+        // Ignore network errors on logout
+      }
     }
   }, []);
 
@@ -48,7 +51,10 @@ export const AuthProvider = ({ children }) => {
         localStorage.setItem('vetvision_user', JSON.stringify(profile));
       } catch (err) {
         if (err.status === 401) {
-          logout();
+          localStorage.removeItem('vetvision_access_token');
+          localStorage.removeItem('vetvision_user');
+          setUser(null);
+          setAccessToken(null);
         }
       } finally {
         setIsLoading(false);
@@ -59,12 +65,15 @@ export const AuthProvider = ({ children }) => {
 
     // Listen for 401 expiration event from API client
     const handleExpired = () => {
-      logout();
+      localStorage.removeItem('vetvision_access_token');
+      localStorage.removeItem('vetvision_user');
+      setUser(null);
+      setAccessToken(null);
     };
 
     window.addEventListener('vetvision_auth_expired', handleExpired);
     return () => window.removeEventListener('vetvision_auth_expired', handleExpired);
-  }, [logout]);
+  }, []);
 
   const login = async (credentials) => {
     const res = await authApi.login(credentials);
@@ -106,16 +115,16 @@ export const AuthProvider = ({ children }) => {
 
   const storedToken = localStorage.getItem('vetvision_access_token');
   const isTokenValid = Boolean(storedToken && storedToken !== 'undefined' && storedToken !== 'null');
-  const role = user?.role || 'pet_owner';
-  const isDoctor = role === 'doctor';
-  const isOwner = role === 'pet_owner';
+  const role = 'pet_owner';
+  const isDoctor = false;
+  const isOwner = true;
 
   const value = {
     user,
     accessToken,
     role,
-    isDoctor,
-    isOwner,
+    isDoctor: false,
+    isOwner: true,
     isAuthenticated: Boolean((accessToken || isTokenValid) && (user || localStorage.getItem('vetvision_user'))),
     isLoading,
     login,

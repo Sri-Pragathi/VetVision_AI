@@ -253,3 +253,45 @@ class AssessmentService:
         db.session.add(note)
         db.session.commit()
         return note.to_dict()
+
+    # ----------------------------------------------------
+    # Intake Draft & Step Resumption Management
+    # ----------------------------------------------------
+
+    @staticmethod
+    def save_draft(
+        assessment_id: str,
+        user_id: str,
+        current_step: int,
+        draft_data: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """Save in-progress intake draft state and step position."""
+        assessment = AssessmentService._verify_assessment_ownership(assessment_id, user_id)
+        if assessment.status != HealthAssessment.STATUS_IN_PROGRESS:
+            raise ValidationException("Cannot save draft for completed or cancelled assessment.")
+
+        assessment.current_step = max(1, min(7, int(current_step)))
+        if draft_data is not None:
+            assessment.draft_data = draft_data
+
+        db.session.commit()
+        return assessment.to_dict()
+
+    @staticmethod
+    def get_active_draft(
+        user_id: str,
+        pet_id: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """Find the latest in-progress draft for the user or a specific pet."""
+        query = (
+            HealthAssessment.query.join(Pet)
+            .filter(
+                Pet.owner_id == user_id,
+                HealthAssessment.status == HealthAssessment.STATUS_IN_PROGRESS,
+            )
+        )
+        if pet_id:
+            query = query.filter(HealthAssessment.pet_id == pet_id)
+
+        draft = query.order_by(HealthAssessment.updated_at.desc()).first()
+        return draft.to_dict() if draft else None

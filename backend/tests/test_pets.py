@@ -172,3 +172,82 @@ def test_delete_own_pet(client, registered_user):
         headers=registered_user["headers"],
     )
     assert get_res.status_code == 404
+
+
+def test_create_and_update_pet_with_enhanced_profile_fields(client, registered_user):
+    """Verify pet creation and updates with medical history, weight unit, photo URL, and notes."""
+    payload = {
+        "name": "Max",
+        "species": "Dog",
+        "breed": "Golden Retriever",
+        "sex": "Male",
+        "weight": 32.4,
+        "weight_unit": "kg",
+        "photo_url": "https://example.com/photos/max.jpg",
+        "spayed_neutered": True,
+        "vaccination_status": "Up to date",
+        "vaccination_history": "Rabies (2025), DHPP (2025), Bordetella (2026)",
+        "medical_history": "Cruciate ligament repair (2024), ear infection resolved (2025)",
+        "notes": "Loves tennis balls, nervous around thunderstorms.",
+    }
+    create_res = client.post(
+        "/api/v1/pets",
+        headers=registered_user["headers"],
+        json=payload,
+    )
+    assert create_res.status_code == 201
+    data = create_res.get_json()["data"]
+    assert data["name"] == "Max"
+    assert data["weight_unit"] == "kg"
+    assert data["photo_url"] == "https://example.com/photos/max.jpg"
+    assert data["spayed_neutered"] is True
+    assert "Rabies" in data["vaccination_history"]
+    assert "Cruciate" in data["medical_history"]
+    assert "tennis balls" in data["notes"]
+
+    pet_id = data["id"]
+
+    # Update medical history and notes
+    update_res = client.put(
+        f"/api/v1/pets/{pet_id}",
+        headers=registered_user["headers"],
+        json={
+            "weight": 72.0,
+            "weight_unit": "lbs",
+            "notes": "Updated: now taking joint supplements daily.",
+        },
+    )
+    assert update_res.status_code == 200
+    up_data = update_res.get_json()["data"]
+    assert up_data["weight"] == 72.0
+    assert up_data["weight_unit"] == "lbs"
+    assert "joint supplements" in up_data["notes"]
+    assert up_data["spayed_neutered"] is True
+
+
+def test_multi_pet_registration_per_owner(client, registered_user):
+    """Verify that a single owner can create and manage multiple distinct pet profiles."""
+    pets_to_create = [
+        {"name": "Milo", "species": "Dog", "breed": "Beagle"},
+        {"name": "Cleo", "species": "Cat", "breed": "Siamese"},
+        {"name": "Pip", "species": "Bird", "breed": "Cockatiel"},
+    ]
+    created_ids = []
+    for pet_data in pets_to_create:
+        res = client.post(
+            "/api/v1/pets",
+            headers=registered_user["headers"],
+            json=pet_data,
+        )
+        assert res.status_code == 201
+        created_ids.append(res.get_json()["data"]["id"])
+
+    # List all pets
+    list_res = client.get("/api/v1/pets", headers=registered_user["headers"])
+    assert list_res.status_code == 200
+    retrieved_pets = list_res.get_json()["data"]
+    retrieved_names = [p["name"] for p in retrieved_pets]
+
+    for expected_name in ["Milo", "Cleo", "Pip"]:
+        assert expected_name in retrieved_names
+

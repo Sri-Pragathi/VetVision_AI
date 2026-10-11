@@ -10,12 +10,12 @@ import {
   User, 
   Menu, 
   X,
-  ShieldCheck,
-  LayoutDashboard
+  LayoutDashboard,
+  Sparkles
 } from 'lucide-react';
 
 export const Navbar = () => {
-  const { user, isAuthenticated, isDoctor, logout } = useAuth();
+  const { user, isAuthenticated, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -44,7 +44,7 @@ export const Navbar = () => {
         justifyContent: 'space-between',
       }}>
         {/* Brand */}
-        <Link to={isAuthenticated ? (isDoctor ? "/doctor/dashboard" : "/dashboard") : "/"} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <Link to={isAuthenticated ? "/dashboard" : "/"} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <div style={{
             width: '38px',
             height: '38px',
@@ -63,7 +63,7 @@ export const Navbar = () => {
               VetVision<span style={{ color: 'var(--primary)' }}>.AI</span>
             </span>
             <span style={{ display: 'block', fontSize: '10px', fontWeight: '600', color: 'var(--text-muted)', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-              Clinical Triage Platform
+              AI Pet Care Assistant
             </span>
           </div>
         </Link>
@@ -72,67 +72,66 @@ export const Navbar = () => {
         <nav style={{ display: 'flex', alignItems: 'center', gap: '8px' }} className="desktop-nav">
           {isAuthenticated ? (
             <>
-              {isDoctor ? (
-                <>
-                  <Link 
-                    to="/doctor/dashboard" 
-                    className={`btn btn-sm ${isActive('/doctor/dashboard') ? 'btn-secondary' : ''}`}
-                    style={{ color: isActive('/doctor/dashboard') ? 'var(--primary)' : 'var(--text-muted)' }}
-                  >
-                    <LayoutDashboard size={16} />
-                    Patient Cases
-                  </Link>
-                  <div style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    padding: '3px 8px',
-                    borderRadius: 'var(--radius-full)',
-                    backgroundColor: '#ecfdf5',
-                    color: '#065f46',
-                    fontSize: '11px',
-                    fontWeight: '700',
-                    border: '1px solid #a7f3d0'
-                  }}>
-                    <ShieldCheck size={13} />
-                    Doctor Portal
-                  </div>
-                </>
-              ) : (
-                <>
-                  <Link 
-                    to="/dashboard" 
-                    className={`btn btn-sm ${isActive('/dashboard') ? 'btn-secondary' : ''}`}
-                    style={{ color: isActive('/dashboard') ? 'var(--primary)' : 'var(--text-muted)' }}
-                  >
-                    <LayoutDashboard size={16} />
-                    Dashboard
-                  </Link>
-                  <Link 
-                    to="/pets" 
-                    className={`btn btn-sm ${isActive('/pets') ? 'btn-secondary' : ''}`}
-                    style={{ color: isActive('/pets') ? 'var(--primary)' : 'var(--text-muted)' }}
-                  >
-                    <FolderHeart size={16} />
-                    My Pets
-                  </Link>
-                  <Link 
-                    to="/reports" 
-                    className={`btn btn-sm ${isActive('/reports') ? 'btn-secondary' : ''}`}
-                    style={{ color: isActive('/reports') ? 'var(--primary)' : 'var(--text-muted)' }}
-                  >
-                    <FileText size={16} />
-                    Reports
-                  </Link>
-                  
-                  <div style={{ width: '1px', height: '24px', backgroundColor: 'var(--border-light)', margin: '0 4px' }} />
+              <Link 
+                to="/dashboard" 
+                className={`btn btn-sm ${isActive('/dashboard') ? 'btn-secondary' : ''}`}
+                style={{ color: isActive('/dashboard') ? 'var(--primary)' : 'var(--text-muted)' }}
+              >
+                <LayoutDashboard size={16} />
+                Dashboard
+              </Link>
+              <Link 
+                to="/pets" 
+                className={`btn btn-sm ${isActive('/pets') ? 'btn-secondary' : ''}`}
+                style={{ color: isActive('/pets') ? 'var(--primary)' : 'var(--text-muted)' }}
+              >
+                <FolderHeart size={16} />
+                My Pets
+              </Link>
+              <Link 
+                to="/reports" 
+                className={`btn btn-sm ${isActive('/reports') ? 'btn-secondary' : ''}`}
+                style={{ color: isActive('/reports') ? 'var(--primary)' : 'var(--text-muted)' }}
+              >
+                <FileText size={16} />
+                Health Reports
+              </Link>
 
-                  <Link to="/assessments/new" className="btn btn-primary btn-sm">
-                    <PlusCircle size={16} />
-                    New Assessment
-                  </Link>
-                </>
-              )}
+              <Link 
+                to="/assistant" 
+                className={`btn btn-sm ${isActive('/assistant') ? 'btn-secondary' : ''}`}
+                style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '6px',
+                  color: isActive('/assistant') ? 'var(--primary)' : 'var(--text-main)',
+                  fontWeight: '700',
+                  background: isActive('/assistant') ? 'rgba(13, 148, 136, 0.12)' : 'linear-gradient(135deg, rgba(240, 253, 250, 0.8), rgba(245, 243, 255, 0.8))',
+                  border: '1px solid rgba(13, 148, 136, 0.25)',
+                  padding: '6px 12px',
+                  borderRadius: 'var(--radius-full)'
+                }}
+              >
+                <Sparkles size={15} color="#0d9488" />
+                <span>AI Assistant</span>
+                <span style={{
+                  fontSize: '10px',
+                  fontWeight: '800',
+                  letterSpacing: '0.04em',
+                  color: '#0f766e',
+                  backgroundColor: '#ccfbf1',
+                  padding: '1px 6px',
+                  borderRadius: '10px',
+                  marginLeft: '2px'
+                }}>PRO</span>
+              </Link>
+              
+              <div style={{ width: '1px', height: '24px', backgroundColor: 'var(--border-light)', margin: '0 4px' }} />
+
+              <Link to="/assessments/new" className="btn btn-primary btn-sm">
+                <PlusCircle size={16} />
+                New Assessment
+              </Link>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: '8px' }}>
                 <div style={{
@@ -210,7 +209,21 @@ export const Navbar = () => {
                 <FolderHeart size={18} /> My Pets
               </Link>
               <Link to="/reports" onClick={() => setMobileMenuOpen(false)} className="btn btn-secondary" style={{ justifyContent: 'flex-start' }}>
-                <FileText size={18} /> Clinical Reports
+                <FileText size={18} /> Health Reports
+              </Link>
+              <Link 
+                to="/assistant" 
+                onClick={() => setMobileMenuOpen(false)} 
+                className="btn btn-secondary" 
+                style={{ 
+                  justifyContent: 'flex-start',
+                  background: 'linear-gradient(135deg, #f0fdfa 0%, #f5f3ff 100%)',
+                  borderColor: '#99f6e4',
+                  color: 'var(--primary)',
+                  fontWeight: '700'
+                }}
+              >
+                <Sparkles size={18} color="#0d9488" /> AI Assistant (PRO Space)
               </Link>
               <Link to="/assessments/new" onClick={() => setMobileMenuOpen(false)} className="btn btn-primary" style={{ justifyContent: 'flex-start' }}>
                 <PlusCircle size={18} /> Start Assessment

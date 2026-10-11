@@ -64,10 +64,10 @@ export const RegisterPage = () => {
             <Activity size={24} />
           </div>
           <h2 style={{ fontSize: '22px', fontWeight: '800', color: 'var(--text-main)' }}>
-            Create an Account
+            Create Pet Owner Account
           </h2>
           <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '4px' }}>
-            Start monitoring your pet's health and clinical assessments
+            Start monitoring your pets with AI health assessments and care guides
           </p>
         </div>
 
@@ -91,12 +91,12 @@ export const RegisterPage = () => {
 
         <form onSubmit={handleSubmit}>
           <div className="form-group">
-            <label className="form-label" htmlFor="name">Full Name</label>
+            <label className="form-label" htmlFor="name">Your Name</label>
             <input
               id="name"
               type="text"
               className="form-input"
-              placeholder="Dr. Jane Smith or Pet Owner"
+              placeholder="e.g. Sri Pragathi or Jane Smith"
               value={name}
               onChange={(e) => setName(e.target.value)}
               required

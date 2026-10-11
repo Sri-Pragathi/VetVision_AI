@@ -418,3 +418,58 @@ def test_ai_data_transformation(client, registered_user, test_assessment):
     assert emergency["risk_level"] == "emergency"
     assert len(emergency["flags"]) >= 1
     assert "disclaimer" in emergency
+
+
+def test_save_and_retrieve_intake_draft(client, registered_user, test_assessment, test_pet):
+    """Verify debounced intake draft saving and active-draft recovery."""
+    assessment_id = test_assessment["id"]
+
+    # 1. Save draft with current_step=3 and custom draft_data
+    save_payload = {
+        "current_step": 3,
+        "draft_data": {
+            "step": 3,
+            "answers": {"vomiting_frequency": 4},
+            "observations": {"appetite": "decreased"},
+        },
+    }
+    res = client.put(
+        f"/api/v1/assessments/{assessment_id}/draft",
+        headers=registered_user["headers"],
+        json=save_payload,
+    )
+    assert res.status_code == 200
+    data = res.get_json()["data"]
+    assert data["current_step"] == 3
+    assert data["draft_data"]["answers"]["vomiting_frequency"] == 4
+
+    # 2. Retrieve active draft via GET /active-draft
+    active_res = client.get(
+        "/api/v1/assessments/active-draft",
+        headers=registered_user["headers"],
+    )
+    assert active_res.status_code == 200
+    active_data = active_res.get_json()["data"]
+    assert active_data is not None
+    assert active_data["id"] == assessment_id
+    assert active_data["current_step"] == 3
+    assert active_data["draft_data"]["observations"]["appetite"] == "decreased"
+
+    # 3. Retrieve active draft by pet_id filter
+    pet_active_res = client.get(
+        f"/api/v1/assessments/active-draft?pet_id={test_pet['id']}",
+        headers=registered_user["headers"],
+    )
+    assert pet_active_res.status_code == 200
+    assert pet_active_res.get_json()["data"]["id"] == assessment_id
+
+
+def test_active_draft_user_isolation(client, registered_user, second_user, test_assessment):
+    """Verify that user B cannot see user A's active draft."""
+    # User B checks for active draft
+    res = client.get(
+        "/api/v1/assessments/active-draft",
+        headers=second_user["headers"],
+    )
+    assert res.status_code == 200
+    assert res.get_json().get("data") is None

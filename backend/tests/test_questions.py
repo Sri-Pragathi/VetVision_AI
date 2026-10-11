@@ -774,3 +774,43 @@ def test_answer_submission_and_retrieval_contract(
     if opt:
         assert submitted["selected_option_id"] == opt["id"]
 
+
+def test_non_vomiting_symptom_does_not_ask_vomiting_questions(client, registered_user, test_pet):
+    """Verify that selecting diarrhea or coughing asks symptom-relevant questions and NOT vomiting."""
+    # 1. Fetch diarrhea symptom
+    sym_res = client.get("/api/v1/symptoms")
+    symptoms = sym_res.get_json()["data"]
+    diarrhea = next(s for s in symptoms if s["name"].lower() == "diarrhea")
+
+    # 2. Create assessment with diarrhea
+    ass_res = client.post(
+        f"/api/v1/pets/{test_pet['id']}/assessments",
+        headers=registered_user["headers"],
+    )
+    assessment_id = ass_res.get_json()["data"]["id"]
+
+    client.post(
+        f"/api/v1/assessments/{assessment_id}/symptoms",
+        headers=registered_user["headers"],
+        json={
+            "symptom_id": diarrhea["id"],
+            "severity": "moderate",
+            "duration_value": 2,
+            "duration_unit": "days",
+        },
+    )
+
+    # 3. Request next questions
+    next_res = client.get(
+        f"/api/v1/assessments/{assessment_id}/next-questions",
+        headers=registered_user["headers"],
+    )
+    assert next_res.status_code == 200
+    questions = next_res.get_json()["data"]["questions"]
+    assert len(questions) > 0
+
+    # Ensure diarrhea questions appear and NO vomiting-specific questions appear
+    question_texts = [q["question_text"].lower() for q in questions]
+    assert any("stool" in t or "diarrhea" in t for t in question_texts)
+    assert not any("vomit" in t for t in question_texts), "Non-vomiting symptom must not return vomiting questions"
+

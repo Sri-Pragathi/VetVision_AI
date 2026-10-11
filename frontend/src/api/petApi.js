@@ -25,4 +25,12 @@ export const petApi = {
     const res = await apiClient.get(`/pets/${petId}/assessments`);
     return res.data;
   },
+  uploadAvatar: async (petId, file) => {
+    const formData = new FormData();
+    formData.append('image', file);
+    const res = await apiClient.post(`/pets/${petId}/avatar`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return res.data;
+  },
 };

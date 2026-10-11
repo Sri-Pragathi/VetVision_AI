@@ -27,10 +27,16 @@ class Pet(db.Model):
     sex = db.Column(db.String(20), nullable=True)        # Male, Female, Neutered, Spayed
     date_of_birth = db.Column(db.Date, nullable=True)
     weight = db.Column(db.Float, nullable=True)          # in kilograms or pounds
+    weight_unit = db.Column(db.String(10), default="kg", nullable=True)
+    photo_url = db.Column(db.String(500), nullable=True)
+    spayed_neutered = db.Column(db.Boolean, nullable=True)
     allergies = db.Column(db.Text, nullable=True)
     existing_conditions = db.Column(db.Text, nullable=True)
     current_medications = db.Column(db.Text, nullable=True)
     vaccination_status = db.Column(db.String(50), nullable=True)
+    vaccination_history = db.Column(db.Text, nullable=True)
+    medical_history = db.Column(db.Text, nullable=True)
+    notes = db.Column(db.Text, nullable=True)
 
     created_at = db.Column(
         db.DateTime(timezone=True),
@@ -76,10 +82,16 @@ class Pet(db.Model):
             "date_of_birth": self.date_of_birth.isoformat() if self.date_of_birth else None,
             "age": self.age,
             "weight": self.weight,
+            "weight_unit": self.weight_unit or "kg",
+            "photo_url": self.photo_url,
+            "spayed_neutered": self.spayed_neutered,
             "allergies": self.allergies,
             "existing_conditions": self.existing_conditions,
             "current_medications": self.current_medications,
             "vaccination_status": self.vaccination_status,
+            "vaccination_history": self.vaccination_history,
+            "medical_history": self.medical_history,
+            "notes": self.notes,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }

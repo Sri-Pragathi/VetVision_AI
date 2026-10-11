@@ -773,3 +773,62 @@ def test_report_validation_errors(client, registered_user, test_assessment):
     )
     assert res_cancelled.status_code in [400, 422]
     assert "cancelled" in res_cancelled.get_json()["message"]
+
+
+def test_report_with_doctor_review_overlay(client, registered_user, test_assessment):
+    """Test 25: Verify doctor review is included in report data and rendered in HTML output."""
+    import uuid
+    from app.extensions import db
+    from app.models.user import User
+    from app.models.doctor_review import DoctorReview
+
+    _populate_full_assessment(client, registered_user, test_assessment)
+    headers = registered_user["headers"]
+    assessment_id = test_assessment["id"]
+
+    # Create doctor and add a review
+    doc = User(
+        name="Dr. Taylor Brooks, DVM",
+        email=f"doc_{uuid.uuid4().hex[:6]}@clinic.vet",
+        password="ValidPassword123!",
+        role=User.ROLE_DOCTOR,
+    )
+    db.session.add(doc)
+    db.session.commit()
+
+    review = DoctorReview(
+        assessment_id=assessment_id,
+        doctor_id=doc.id,
+        status="reviewed",
+        override_triage_level="urgent",
+        doctor_notes="Clinical auscultation reveals moderate airway sensitivity.",
+        recommendations="Keep pet indoors in quiet environment; monitor breathing.",
+        prescriptions="Amoxicillin 250mg BID for 7 days.",
+    )
+    db.session.add(review)
+    db.session.commit()
+
+    # Generate report
+    res = client.post(
+        f"/api/v1/assessments/{assessment_id}/reports",
+        headers=headers,
+    )
+    assert res.status_code == 201
+    report = res.get_json()["data"]
+    report_id = report["id"]
+
+    # Retrieve report details
+    get_res = client.get(f"/api/v1/reports/{report_id}", headers=headers)
+    assert get_res.status_code == 200
+    report_data = get_res.get_json()["data"]
+    assert "latest_doctor_review" in report_data
+    assert report_data["latest_doctor_review"]["override_triage_level"] == "urgent"
+    assert "Amoxicillin" in report_data["latest_doctor_review"]["prescriptions"]
+
+    # Retrieve HTML representation
+    html_res = client.get(f"/api/v1/reports/{report_id}/html", headers=headers)
+    assert html_res.status_code == 200
+    html_text = html_res.get_data(as_text=True)
+    assert "Verified Veterinarian Clinical Review &amp; Treatment Plan" in html_text or "Verified Veterinarian Clinical Review" in html_text
+    assert "Taylor Brooks" in html_text
+    assert "Amoxicillin" in html_text

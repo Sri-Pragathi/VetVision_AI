@@ -17,6 +17,10 @@ import {
   Eye,
   Camera,
   CheckCircle2,
+  HeartPulse,
+  PhoneCall,
+  Sparkles,
+  Bot
 } from 'lucide-react';
 import { reportApi } from '../api/reportApi';
 import { API_BASE_URL } from '../api/client';
@@ -24,6 +28,7 @@ import TriageBadge from '../components/common/TriageBadge';
 import EmergencyBanner from '../components/common/EmergencyBanner';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import ErrorMessage from '../components/common/ErrorMessage';
+import AiPetCareGuide from '../components/report/AiPetCareGuide';
 
 const formatDuration = (duration, durationDisplay) => {
   if (durationDisplay) return String(durationDisplay);
@@ -173,7 +178,25 @@ DISCLAIMER: VetVision AI is an AI-assisted triage and early-warning tool, not a 
             <ArrowLeft size={16} /> Back
           </button>
 
-          <div style={{ display: 'flex', gap: '0.6rem' }}>
+          <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+            <button
+              onClick={() => {
+                document.getElementById('ai-pet-care-guide')?.scrollIntoView({ behavior: 'smooth' });
+              }}
+              className="btn btn-outline btn-sm"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+                borderColor: '#0284c7',
+                color: '#0284c7',
+                backgroundColor: 'rgba(2, 132, 199, 0.05)',
+                fontWeight: 600,
+              }}
+            >
+              <HeartPulse size={15} /> AI Pet Care Guide
+            </button>
+
             <button
               onClick={handleCopyHandoff}
               className="btn btn-outline btn-sm"
@@ -415,6 +438,77 @@ DISCLAIMER: VetVision AI is an AI-assisted triage and early-warning tool, not a 
                 </div>
               </div>
             </div>
+          </div>
+
+          {/* Prominent Section: AI Pet Care Guide & Safety Precautions */}
+          <AiPetCareGuide
+            careGuide={rd.immediate_care_guide}
+            petName={pet.name}
+            riskLevel={risk.risk_level}
+          />
+
+          {/* Interactive Owner Guidance: Dedicated AI Chatbot Space */}
+          <div style={{
+            margin: '2rem 0',
+            padding: '24px 28px',
+            borderRadius: 'var(--radius-xl)',
+            background: 'linear-gradient(135deg, #042f2e 0%, #134e4a 60%, #0f766e 100%)',
+            color: '#ffffff',
+            boxShadow: '0 10px 25px -5px rgba(13, 148, 136, 0.25)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '20px'
+          }}>
+            <div style={{ maxWidth: '580px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                <span style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  backgroundColor: 'rgba(255, 255, 255, 0.15)',
+                  color: '#99f6e4',
+                  fontSize: '11px',
+                  fontWeight: '800',
+                  padding: '3px 8px',
+                  borderRadius: '999px',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em'
+                }}>
+                  <Sparkles size={12} color="#5eead4" /> Dedicated AI Chatbot Space
+                </span>
+                <span style={{ fontSize: '11px', color: '#99f6e4' }}>
+                  Context: {pet.name}
+                </span>
+              </div>
+              <h3 style={{ fontSize: '18px', fontWeight: '800', color: '#ffffff', margin: '0 0 6px 0' }}>
+                Have questions about {pet.name}&apos;s report or care instructions?
+              </h3>
+              <p style={{ fontSize: '13px', color: '#ccfbf1', margin: 0, lineHeight: 1.5 }}>
+                Open our dedicated full-screen AI chatroom. Ask follow-up questions regarding medications, watch-outs, or symptom progression with real-time veterinary safety guardrails.
+              </p>
+            </div>
+
+            <Link
+              to={`/assistant?petId=${pet.id}&assessmentId=${report.assessment_id}`}
+              className="btn btn-lg"
+              style={{
+                backgroundColor: '#ffffff',
+                color: '#0f766e',
+                fontWeight: '800',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '12px 22px',
+                borderRadius: 'var(--radius-lg)',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+              }}
+            >
+              <Bot size={18} color="#0d9488" />
+              <span>Discuss in AI Chatroom</span>
+              <ChevronRight size={16} />
+            </Link>
           </div>
 
           {/* Section 3: Reported Symptoms Table */}
