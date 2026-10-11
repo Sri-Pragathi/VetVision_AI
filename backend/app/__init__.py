@@ -49,6 +49,10 @@ def create_app(config_name: Optional[str] = None) -> Flask:
     # Configure CORS
     raw_cors = os.getenv("CORS_ORIGINS", application.config.get("CORS_ORIGINS", "*"))
     cors_origins = parse_cors_origins(raw_cors, env=config_name)
+    if isinstance(cors_origins, list):
+        vercel_pattern = r"https://.*\.vercel\.app"
+        if vercel_pattern not in cors_origins:
+            cors_origins.append(vercel_pattern)
     application.config["CORS_ORIGINS"] = cors_origins
     cors.init_app(application, resources={r"/api/*": {"origins": cors_origins}})
 
