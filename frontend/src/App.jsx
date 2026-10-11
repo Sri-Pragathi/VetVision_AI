@@ -7,6 +7,7 @@ import Navbar from './components/common/Navbar';
 import Footer from './components/common/Footer';
 import LoadingSpinner from './components/common/LoadingSpinner';
 import ErrorBoundary from './components/common/ErrorBoundary';
+import PwaStatusBanner from './components/common/PwaStatusBanner';
 
 // Pages
 import LandingPage from './pages/LandingPage';
@@ -89,6 +90,7 @@ function AppContent() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+      <PwaStatusBanner />
       <Navbar />
       <main style={{ flex: 1 }}>
         <ErrorBoundary key={location.pathname} locationKey={location.key} pathname={location.pathname}>

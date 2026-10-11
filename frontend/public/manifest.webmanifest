@@ -1,0 +1,37 @@
+{
+  "name": "VetVision AI",
+  "short_name": "VetVision AI",
+  "description": "AI-assisted pet health early-warning and veterinary support platform. Clinical triage, adaptive follow-up, computer vision observations, and explainable summaries.",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#f8fafc",
+  "theme_color": "#0d9488",
+  "categories": [
+    "medical",
+    "health",
+    "lifestyle"
+  ],
+  "icons": [
+    {
+      "src": "/icons/pwa-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/pwa-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/pwa-maskable-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
