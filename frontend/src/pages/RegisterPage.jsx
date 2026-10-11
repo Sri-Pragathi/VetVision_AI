@@ -18,13 +18,35 @@ export const RegisterPage = () => {
     e.preventDefault();
     setError(null);
 
-    if (password !== confirmPassword) {
-      setError('Passwords do not match.');
+    const trimmedName = name.trim();
+    if (trimmedName.length < 2) {
+      setError('Name must be at least 2 characters long.');
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim())) {
+      setError('Please enter a valid email address.');
       return;
     }
 
     if (password.length < 8) {
       setError('Password must be at least 8 characters long.');
+      return;
+    }
+
+    if (!/[A-Za-z]/.test(password)) {
+      setError('Password must contain at least one letter.');
+      return;
+    }
+
+    if (!/[0-9]/.test(password)) {
+      setError('Password must contain at least one digit (0-9).');
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setError('Passwords do not match.');
       return;
     }
 
@@ -125,11 +147,14 @@ export const RegisterPage = () => {
               id="password"
               type="password"
               className="form-input"
-              placeholder="At least 8 characters"
+              placeholder="e.g. MySecret123"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
             />
+            <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+              Must be at least 8 characters and include at least one letter and one number (0-9).
+            </p>
           </div>
 
           <div className="form-group">

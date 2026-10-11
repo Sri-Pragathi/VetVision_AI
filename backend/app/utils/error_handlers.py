@@ -72,8 +72,20 @@ def register_error_handlers(app: Flask) -> None:
 
     @app.errorhandler(ValidationError)
     def handle_marshmallow_validation(err: ValidationError):
+        first_error_msg = None
+        if isinstance(err.messages, dict):
+            for field, msgs in err.messages.items():
+                if isinstance(msgs, list) and msgs:
+                    first_error_msg = f"{msgs[0]}"
+                    break
+                elif isinstance(msgs, str):
+                    first_error_msg = msgs
+                    break
+        elif isinstance(err.messages, list) and err.messages:
+            first_error_msg = str(err.messages[0])
+
         return error_response(
-            message="Validation failed",
+            message=first_error_msg or "Validation failed",
             errors=err.messages,
             status_code=422,
         )

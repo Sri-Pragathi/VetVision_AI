@@ -50,13 +50,34 @@ apiClient.interceptors.response.use(
       window.dispatchEvent(new Event('vetvision_auth_expired'));
     }
 
-    let message =
-      error.response?.data?.message ||
-      (typeof error.response?.data?.error === 'string'
-        ? error.response?.data?.error
-        : error.response?.data?.error?.message) ||
-      error.message ||
-      'An unexpected error occurred. Please try again.';
+    // Extract detailed validation messages if provided by the backend
+    let message = null;
+    const errorsObj = error.response?.data?.errors;
+    if (errorsObj && typeof errorsObj === 'object') {
+      const messages = [];
+      for (const [key, val] of Object.entries(errorsObj)) {
+        if (Array.isArray(val)) {
+          messages.push(...val);
+        } else if (typeof val === 'string') {
+          messages.push(val);
+        } else if (typeof val === 'object' && val !== null) {
+          messages.push(...Object.values(val).flat());
+        }
+      }
+      if (messages.length > 0) {
+        message = messages.join(' ');
+      }
+    }
+
+    if (!message) {
+      message =
+        error.response?.data?.message ||
+        (typeof error.response?.data?.error === 'string'
+          ? error.response?.data?.error
+          : error.response?.data?.error?.message) ||
+        error.message ||
+        'An unexpected error occurred. Please try again.';
+    }
 
     if (typeof message === 'object') {
       try {
