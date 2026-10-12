@@ -5,14 +5,27 @@ export function registerServiceWorker() {
     return;
   }
 
-  // Register when page has finished loading
+  // During local development (Vite dev server), unregister any active service worker
+  // to prevent stale caching of dynamic ES modules or HMR disruption.
+  if (import.meta.env.DEV) {
+    navigator.serviceWorker.getRegistrations().then((registrations) => {
+      for (const reg of registrations) {
+        reg.unregister();
+      }
+    });
+    return;
+  }
+
+  // In production builds, register the service worker for reliable PWA capabilities
   window.addEventListener('load', () => {
     const swUrl = '/sw.js';
 
     navigator.serviceWorker
       .register(swUrl)
       .then((registration) => {
-        // Registration successful
+        // Check for updates on every page load
+        registration.update().catch(() => {});
+
         registration.onupdatefound = () => {
           const installingWorker = registration.installing;
           if (installingWorker == null) {
@@ -22,12 +35,14 @@ export function registerServiceWorker() {
           installingWorker.onstatechange = () => {
             if (installingWorker.state === 'installed') {
               if (navigator.serviceWorker.controller) {
-                // New content is available; notify user
-                window.dispatchEvent(new CustomEvent('vetvision_pwa_update_available', {
-                  detail: { registration },
-                }));
+                // If a new worker is installed, activate it immediately
+                installingWorker.postMessage({ type: 'SKIP_WAITING' });
+                window.dispatchEvent(
+                  new CustomEvent('vetvision_pwa_update_available', {
+                    detail: { registration },
+                  })
+                );
               } else {
-                // Content cached for offline use
                 window.dispatchEvent(new CustomEvent('vetvision_pwa_cached'));
               }
             }
@@ -35,11 +50,10 @@ export function registerServiceWorker() {
         };
       })
       .catch((error) => {
-        // Silently log or handle non-fatal registration failures (e.g. in non-HTTPS local testing)
         console.warn('VetVision AI Service Worker registration failed:', error);
       });
 
-    // Handle controller change (reloads on update activation)
+    // Handle controller change (reloads automatically once new service worker activates)
     let refreshing = false;
     navigator.serviceWorker.addEventListener('controllerchange', () => {
       if (!refreshing) {
@@ -51,7 +65,7 @@ export function registerServiceWorker() {
 }
 
 export function unregisterServiceWorker() {
-  if ('serviceWorker' in navigator) {
+  if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
     navigator.serviceWorker.ready
       .then((registration) => {
         registration.unregister();
