@@ -187,6 +187,9 @@ export default function AiAssistantPage() {
     if (u === 'APPOINTMENT') {
       return { bg: '#e0f2fe', text: '#0369a1', border: '#7dd3fc', label: 'APPOINTMENT RECOMMENDED' };
     }
+    if (u === 'GENERAL_INFO' || u === 'INFO') {
+      return { bg: '#f1f5f9', text: '#475569', border: '#cbd5e1', label: 'PET CARE SCOPE' };
+    }
     return { bg: '#ecfdf5', text: '#047857', border: '#6ee7b7', label: 'HOME MONITORING' };
   };
 

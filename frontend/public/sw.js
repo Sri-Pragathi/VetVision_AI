@@ -1,7 +1,7 @@
 // VetVision AI — Clinical Healthcare Progressive Web App Service Worker
-// Version: 2.0.0
+// Version: 2.1.0
 
-const CACHE_NAME = 'vetvision-v2';
+const CACHE_NAME = 'vetvision-v2.1';
 
 // Static application shell assets to pre-cache on install
 const PRECACHE_ASSETS = [

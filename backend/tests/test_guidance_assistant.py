@@ -135,3 +135,68 @@ def test_ask_single_vomit_monitoring(client, test_setup):
     assert "small amounts of clean room-temperature water" in data["answer"]
     assert data["pet_context"]["name"] == "Luna"
     assert data["pet_context"]["species"] == "Cat"
+
+
+def test_ask_out_of_topic_query_politely_rejected(client, test_setup):
+    """Test that non-pet queries (math, trivia, coding) are politely rejected."""
+    for off_topic_q in [
+        "What is the capital of France?",
+        "Write a python script to sort an array",
+        "Who is the president of the United States?",
+        "What is 25 * 4?",
+    ]:
+        res = client.post("/api/v1/guidance/ask", json={"question": off_topic_q})
+        assert res.status_code == 200
+        data = res.get_json()["data"]
+        assert data["urgency_level"] == "GENERAL_INFO"
+        assert "specialized exclusively in pet health" in data["answer"].lower() or "cannot assist with questions outside of pet" in data["answer"].lower()
+        assert len(data["contraindications"]) == 0
+
+
+def test_ask_safe_fruits_nutrition_guidance(client, test_setup):
+    """Test nutrition query regarding blueberries and safe fruits returns helpful dietary advice."""
+    res = client.post("/api/v1/guidance/ask", headers=test_setup["headers"], json={
+        "pet_id": test_setup["pet_id"],
+        "question": "Can my pet safely eat blueberries and apples?",
+    })
+    assert res.status_code == 200
+    data = res.get_json()["data"]
+    assert "Blueberries" in data["answer"]
+    assert "Apples" in data["answer"]
+    assert any("blueberries" in k.lower() for k in data["key_takeaways"])
+
+
+def test_ask_ear_itching_guidance(client, test_setup):
+    """Test ear scratching inquiry returns ear mites, infection triage, and Q-tip contraindication."""
+    res = client.post("/api/v1/guidance/ask", headers=test_setup["headers"], json={
+        "pet_id": test_setup["pet_id"],
+        "question": "Why is my cat constantly scratching her ears and shaking her head?",
+    })
+    assert res.status_code == 200
+    data = res.get_json()["data"]
+    assert "Ear Infections" in data["answer"] or "Ear Mites" in data["answer"]
+    assert any("q-tip" in c.lower() for c in data["contraindications"])
+
+
+def test_ask_vaccination_schedule_guidance(client):
+    """Test puppy/kitten vaccination schedule query returns age milestones."""
+    res = client.post("/api/v1/guidance/ask", json={
+        "question": "What is the recommended core vaccination schedule for a puppy?",
+    })
+    assert res.status_code == 200
+    data = res.get_json()["data"]
+    assert "DHPP" in data["answer"]
+    assert "Rabies" in data["answer"]
+    assert "6 to 8 Weeks" in data["answer"]
+
+
+def test_ask_rabbit_daily_pet_care(client):
+    """Test specific inquiry about rabbit care provides hay diet and GI stasis awareness."""
+    res = client.post("/api/v1/guidance/ask", json={
+        "question": "How do I take care of a rabbit and what should they eat?",
+    })
+    assert res.status_code == 200
+    data = res.get_json()["data"]
+    assert "Timothy hay" in data["answer"]
+    assert "Stasis" in data["answer"]
+

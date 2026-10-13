@@ -101,7 +101,7 @@ class GroqService:
                 headers={
                     "Authorization": f"Bearer {api_key}",
                     "Content-Type": "application/json",
-                    "User-Agent": "VetVisionAI/1.0",
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
                 },
                 method="POST",
             )
@@ -141,7 +141,7 @@ class GroqService:
         pet_name: str = "your pet",
         species: str = "pet",
     ) -> str:
-        """Apply clinical safety guardrails, purge asterisks, and enforce brevity."""
+        """Apply clinical safety guardrails, purge asterisks, and format cleanly."""
         if not text:
             return ""
 
@@ -198,10 +198,10 @@ class GroqService:
         # Normalize multiple blank lines to a maximum of 2 newlines
         cleaned = re.sub(r"\n{3,}", "\n\n", cleaned).strip()
 
-        # Enforce brevity: If response is excessively long (> 220 words), cap cleanly at sentence boundary
+        # Enforce brevity: If response is excessively long (> 200 words), cap cleanly at sentence boundary (<= 190 words)
         words = cleaned.split()
         if len(words) > 200:
-            truncated = " ".join(words[:160])
+            truncated = " ".join(words[:180])
             last_period = max(truncated.rfind("."), truncated.rfind("\n"))
             if last_period > 80:
                 cleaned = truncated[:last_period + 1]
@@ -217,7 +217,7 @@ class GroqService:
         pet_context: Optional[Dict[str, Any]] = None,
         assessment_context: Optional[Dict[str, Any]] = None,
     ) -> Optional[str]:
-        """Generate clinical supportive pet care guidance via Groq LLM with safety guardrails."""
+        """Generate high-quality supportive pet care guidance via Groq LLM with safety guardrails."""
         if not cls.is_available():
             return None
 
@@ -231,25 +231,31 @@ class GroqService:
         if assessment_context:
             symptoms = assessment_context.get("symptoms", [])
             risk_level = assessment_context.get("risk_level", "UNKNOWN")
-            asmt_info = f"\nRecent Intake: Risk Level = {risk_level}, Symptoms = {', '.join(symptoms) if symptoms else 'None'}."
+            asmt_info = f"\nRecent Intake Context: Risk Level = {risk_level}, Reported Symptoms = {', '.join(symptoms) if symptoms else 'None'}."
 
         system_prompt = (
-            f"You are VetVision AI, a supportive veterinary first-aid and triage assistant for pet owners. "
-            f"You are advising an owner about their pet: Name: {pet_name}, Species: {species}, Breed: {breed}, Age: {age}.{asmt_info}\n\n"
-            f"CRITICAL FORMATTING RULES (STRICT):\n"
-            f"1. NO ASTERISKS: Do NOT use any asterisks (*) or double asterisks (**) anywhere in your response. No bold text, no asterisks whatsoever. Write in plain text.\n"
-            f"2. BREVITY: Keep your entire response under 130 words. Be short, direct, empathetic, and clear.\n"
-            f"3. NO TABLES: Never use markdown tables or pipe symbols (|).\n"
-            f"4. STRUCTURE: Use exactly 3 short plain headings followed by 1-2 bullet points (starting with -):\n"
-            f"   WHAT TO DO NOW:\n"
-            f"   WHAT TO WATCH FOR:\n"
-            f"   WHAT NOT TO DO:\n\n"
+            f"You are VetVision AI, an expert, caring, and reliable veterinary health and pet care assistant. "
+            f"You advise owners regarding their pets. "
+            f"Context: Pet Name: {pet_name}, Species: {species}, Breed: {breed}, Age: {age}.{asmt_info}\n\n"
+            f"CORE MISSION:\n"
+            f"Provide direct, prompt, accurate, and comprehensive answers to ALL questions regarding pets and pet health. "
+            f"Cover companion and daily pets including dogs, cats, birds, rabbits, hamsters, guinea pigs, reptiles, turtles, fish, and small mammals. "
+            f"Address all domains: illness symptoms, diet and nutrition, safe vs. toxic foods, first aid, grooming, parasite control (fleas/ticks/worms), "
+            f"dental hygiene, vaccinations, age-specific care (puppies/kittens/seniors), breed traits, and behavior/training.\n\n"
+            f"CRITICAL OUT-OF-TOPIC GUARDRAIL:\n"
+            f"If the user's inquiry is NOT about pets, domestic animals, wildlife, veterinary medicine, or animal care/health "
+            f"(e.g., coding, computer programming, mathematics, general trivia, politics, sports, human medical diagnosis, human cooking recipes): "
+            f"You MUST politely refuse to answer. State clearly that you are specialized exclusively in pet health, animal welfare, and veterinary guidance, "
+            f"and kindly invite them to ask any question regarding pets and pet health.\n\n"
+            f"FORMATTING GUIDELINES:\n"
+            f"1. NO ASTERISKS: Do NOT use any asterisks (*) or double asterisks (**) anywhere. Write in clean plain text.\n"
+            f"2. NO TABLES: Never use markdown table syntax or pipe characters (|). Use plain bullet points (with -) and clear section labels.\n"
+            f"3. PROMPT & STRUCTURED: Give a direct answer immediately upfront, followed by practical details, tips, and when to seek veterinary attention.\n\n"
             f"CLINICAL SAFETY GUARDRAILS:\n"
             f"• Never prescribe medication dosages or definitively diagnose disease.\n"
             f"• STRICT CONTRAINDICATION: Never tell owners to give human medications (acetaminophen/paracetamol is fatal to cats; NSAIDs like ibuprofen cause acute kidney failure in pets).\n"
-            f"• STRICT CONTRAINDICATION: Never tell owners to induce vomiting at home.\n"
-            f"• EMERGENCY OVERRIDE: For breathing difficulty, pale gums, collapse, or seizures, instruct immediate transport to an emergency hospital.\n"
-            f"• Emergency numbers: ASPCA Poison Control (888-426-4435), Pet Poison Helpline (855-764-7661)."
+            f"• STRICT CONTRAINDICATION: Never tell owners to induce vomiting at home. Direct to ASPCA Poison Control (888-426-4435) or emergency vet.\n"
+            f"• EMERGENCY OVERRIDE: For severe signs (breathing difficulty, pale/blue gums, collapse, active seizures, non-stop bleeding), instruct immediate emergency veterinary transport."
         )
 
         messages = [
@@ -257,7 +263,7 @@ class GroqService:
             {"role": "user", "content": question},
         ]
 
-        raw_reply = cls.call_chat_completion(messages=messages, temperature=0.2, max_tokens=300)
+        raw_reply = cls.call_chat_completion(messages=messages, temperature=0.2, max_tokens=700)
         if not raw_reply:
             return None
 
