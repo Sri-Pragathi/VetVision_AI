@@ -94,7 +94,7 @@ export const DashboardPage = () => {
 
   const hour = new Date().getHours();
   const greetingTime = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
-  const ownerName = user?.name ? user.name.trim() : '';
+  const ownerName = user?.name ? user.name.replace(/^dr\.?\s+/i, '').replace(/,\s*dvm/i, '').trim() : '';
   const greetingHeading = ownerName
     ? `${greetingTime}, ${ownerName}!`
     : `${greetingTime}! Welcome back.`;

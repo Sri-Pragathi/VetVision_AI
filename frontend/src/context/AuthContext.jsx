@@ -3,11 +3,20 @@ import { authApi } from '../api/authApi';
 
 const AuthContext = createContext(null);
 
+const cleanUserProfile = (profile) => {
+  if (!profile || typeof profile !== 'object') return profile;
+  if (profile.name && typeof profile.name === 'string') {
+    const cleanName = profile.name.replace(/^dr\.?\s+/i, '').replace(/,\s*dvm/i, '').trim();
+    return { ...profile, name: cleanName };
+  }
+  return profile;
+};
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(() => {
     const saved = localStorage.getItem('vetvision_user');
     try {
-      return saved ? JSON.parse(saved) : null;
+      return saved ? cleanUserProfile(JSON.parse(saved)) : null;
     } catch {
       return null;
     }
@@ -46,7 +55,8 @@ export const AuthProvider = ({ children }) => {
 
       try {
         const userData = await authApi.getCurrentUser();
-        const profile = userData?.data || userData;
+        const rawProfile = userData?.data || userData;
+        const profile = cleanUserProfile(rawProfile);
         setUser(profile);
         localStorage.setItem('vetvision_user', JSON.stringify(profile));
       } catch (err) {
@@ -79,7 +89,8 @@ export const AuthProvider = ({ children }) => {
     const res = await authApi.login(credentials);
     const data = res?.data || res;
     const token = data?.tokens?.access_token || res?.tokens?.access_token;
-    const profile = data?.user || res?.user;
+    const rawProfile = data?.user || res?.user;
+    const profile = cleanUserProfile(rawProfile);
 
     if (!token) {
       throw new Error('Authentication succeeded but access token was missing.');
@@ -98,7 +109,8 @@ export const AuthProvider = ({ children }) => {
     const res = await authApi.register(userData);
     const data = res?.data || res;
     const token = data?.tokens?.access_token || res?.tokens?.access_token;
-    const profile = data?.user || res?.user;
+    const rawProfile = data?.user || res?.user;
+    const profile = cleanUserProfile(rawProfile);
 
     if (!token) {
       throw new Error('Registration succeeded but access token was missing.');

@@ -146,7 +146,7 @@ export const Navbar = () => {
                   color: 'var(--text-main)',
                 }}>
                   <User size={14} color="var(--primary)" />
-                  <span>{user?.name?.split(' ')[0] || 'User'}</span>
+                  <span>{user?.name ? user.name.replace(/^dr\.?\s+/i, '').replace(/,\s*dvm/i, '').trim() : 'User'}</span>
                 </div>
 
                 <button 

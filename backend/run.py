@@ -31,11 +31,14 @@ def init_database(flask_app, current_env):
             if not demo_user:
                 demo_password = os.getenv("DEV_DEMO_PASSWORD", "Password123!")
                 demo_user = User(
-                    name="Dr. John Doe",
+                    name="John Doe",
                     email=demo_email,
                     password=demo_password,
                 )
                 db.session.add(demo_user)
+                db.session.commit()
+            elif demo_user.name and ("Dr." in demo_user.name or "Dr " in demo_user.name):
+                demo_user.name = demo_user.name.replace("Dr. ", "").replace("Dr ", "").strip()
                 db.session.commit()
                 # Add initial demo pet
                 demo_pet = Pet(
